@@ -10,9 +10,10 @@
 // Supports
 //   - Singleton Promotion: If a node has only one child, the parent assumes the
 //     value of the child without rehashing. Shorthand: "promotion".
-//   - Collapse: if all children are the same value, the parent assumes that value
-//     without re-hashing; mostly useful for null values
-//   - Null node values (including promotion and collapse).
+//   - Collapse: if all children are the same value, the parent assumes that
+//     value without re-hashing; mostly useful for null values
+//   - Null node values (including promotion and collapse). A null parent may
+//     only have null children and can never have populated values.
 //
 // This primitive does not do mutlihash projection.  That may be enforced by a
 // parent library.
@@ -30,8 +31,8 @@ var (
 	Collapse = true
 )
 
-// Path represents a single node with its exact coordinate from the root.
-// This is useful for serialization, marshalling, and unmarshalling.
+// Path represents a single node with its exact coordinate from the root. This
+// is useful for serialization, marshalling, and unmarshalling.
 //
 // [] is root. [0] is first child of root. [1] is second child of root. [2] is
 // the third child of root. [0,0] is the first child of the first child. JSON
@@ -48,24 +49,36 @@ var (
 //	]
 type Path []int
 
+// Leaf number from left to right.
+type LeafSerial int
+
 // Null represents an empty value node.
 var Null = []byte{}
 
 // Node is a tree node (root, internal, or leaf). The hashing algorithm of a
-// node is defined by the containing tree.  A node is null when Digest == nil.
+// node is defined by the containing tree.  A node is null when Digest == nil. A null
 type Node struct {
 	Digest   []byte
-	Children []*Node
-	Path         // Path may be unknown (nil)
-	Arity    int // Number of children. Arity is metadata and may be unknown, which is 0.
+	Children []*Node // Nodes are ordered.
+	Path             // Path may be unknown (nil)
+
+	// Metadata or Derived values
+	Arity int // Number of children. Arity is metadata and may be unknown, which is 0.
+
+	// TODO
+	// LeafSerial int // The leaf number may not be calculated.  If value == 0, this isn't calculated.
 }
 
 // Tree is an n-ary Merkle Tree.
 type Tree struct {
-	Root   *Node
-	Hash   crypto.Hash
-	Nodes  []Node
-	leaves []*byte // hashed leaves.  May be empty
+	Hash  crypto.Hash
+	Nodes []Node // Nodes includes root.
+	Root  *Node
+
+	// Derived values
+	leaves      []*Node // Leaves.  May be empty if uncalculated.
+	leafDigests []*byte // hashed leaves.  May be empty.  If empty, leaves has not been calculated or tree is of size 1.
+
 }
 
 // New returns a new empty n-ary Merkle Tree.
@@ -136,50 +149,13 @@ func (t *Tree) RootHash() []byte {
 }
 
 // Size returns the number of leaves.
-func (t *Tree) Size() int { return len(t.leaves) }
+func (t *Tree) Size() int {
+
+	return len(t.leaves)
+}
 
 // Get returns the node at leaf index.
-func (t *Tree) Get(index int) (*Node, error)
-
-// GenerateInclusionProof returns a proof for the leaf at index.
-func (t *Tree) GenerateInclusionProof(index int) (*InclusionProof, error) {
-	return nil, nil
-}
-
-// InclusionProof proves a leaf is in the tree.
-type InclusionProof struct {
-	LeafHash []byte
-	Path     []ProofElement
-	Hash     crypto.Hash
-}
-
-// ProofElement is one step in an inclusion path.
-type ProofElement struct {
-	Hash     []byte // sibling subtree hash
-	Position int    // index in parent (0..Arity-1)
-}
-
-// VerifyInclusion checks an inclusion proof against a known root.
-func VerifyInclusion(proof *InclusionProof, root []byte) (bool, error) {
-	return false, nil
-}
-
-// ConsistencyProof proves one tree is a consistent extension of another.
-type ConsistencyProof struct {
-	OldSize int
-	Hashes  [][]byte
-}
-
-// GenerateConsistencyProof returns a proof that the current tree
-// is a consistent append of a previous tree of size oldSize.
-func (t *Tree) GenerateConsistencyProof(oldSize int) (*ConsistencyProof, error) {
-	return nil, nil
-}
-
-// VerifyConsistency verifies that rootB is a consistent extension of rootA.
-func VerifyConsistency(rootA []byte, sizeA int, rootB []byte, sizeB int, proof *ConsistencyProof) (bool, error) {
-	return false, nil
-}
+func (t *Tree) Get(index int) (*Node, error) { return nil, nil }
 
 // Errors
 var (
