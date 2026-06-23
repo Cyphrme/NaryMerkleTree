@@ -1,0 +1,193 @@
+// Package narymerkletree implements a configurable, arbitrarily structured
+// n-ary Merkle Tree with inclusion and consistency proofs.
+//
+// By default functions assume left filled, but the tree may be constructed as
+// desired.
+//
+// Leafs may be interpreted as leafs, or be known as inner nodes by future
+// proofs.
+//
+// Supports
+//   - Singleton Promotion: If a node has only one child, the parent assumes the
+//     value of the child without rehashing. Shorthand: "promotion".
+//   - Collapse: if all children are the same value, the parent assumes that value
+//     without re-hashing; mostly useful for null values
+//   - Null node values (including promotion and collapse).
+//
+// This primitive does not do mutlihash projection.  That may be enforced by a
+// parent library.
+package narymerkletree
+
+import (
+	"crypto"
+	"encoding/json"
+	"sort"
+)
+
+// Global options
+var (
+	Promote  = true
+	Collapse = true
+)
+
+// Path represents a single node with its exact coordinate from the root.
+// This is useful for serialization, marshalling, and unmarshalling.
+//
+// [] is root. [0] is first child of root. [1] is second child of root. [2] is
+// the third child of root. [0,0] is the first child of the first child. JSON
+// example:
+//
+//	[
+//	 { "path": [],          "digest": "..." }, // Root
+//	 { "path": [0],         "digest": "..." }, // First child form root
+//	 { "path": [0, 0],      "digest": "..." }, // First child of the first child
+//	 { "path": [0, 1],      "digest": "..." }, // Second child of the first child
+//	 { "path": [0, 2],      "digest": "..." }, // Third child of the first child
+//	 { "path": [1],         "digest": "..." }, // Second child from root
+//	 { "path": [1, 0, 2],   "digest": "..." }  // Third child of the first child of the second child from root
+//	]
+type Path []int
+
+// Null represents an empty value node.
+var Null = []byte{}
+
+// Node is a tree node (root, internal, or leaf). The hashing algorithm of a
+// node is defined by the containing tree.  A node is null when Digest == nil.
+type Node struct {
+	Digest   []byte
+	Children []*Node
+	Path         // Path may be unknown (nil)
+	Arity    int // Number of children. Arity is metadata and may be unknown, which is 0.
+}
+
+// Tree is an n-ary Merkle Tree.
+type Tree struct {
+	Root   *Node
+	Hash   crypto.Hash
+	Nodes  []Node
+	leaves []*byte // hashed leaves.  May be empty
+}
+
+// New returns a new empty n-ary Merkle Tree.
+func New(h crypto.Hash) (*Tree, error) {
+	return &Tree{Hash: h}, nil
+}
+
+// Sort sorts the nodes in lexicographical path order.  This makes the output
+// deterministic.
+func (t *Tree) Sort() {
+	sort.Slice(t.Nodes, func(i, j int) bool {
+		return comparePaths(t.Nodes[i].Path, t.Nodes[j].Path) < 0
+	})
+}
+
+// MarshalJSON returns a nicely sorted JSON representation.
+func (t *Tree) MarshalJSON() ([]byte, error) {
+	t.Sort() // ensure deterministic output
+	type alias Tree
+	return json.Marshal(alias(*t))
+}
+
+// UnmarshalJSON automatically sorts after loading.
+func (t *Tree) UnmarshalJSON(data []byte) error {
+	type alias Tree
+	if err := json.Unmarshal(data, (*alias)(t)); err != nil {
+		return err
+	}
+	t.Sort()
+	return nil
+}
+
+// comparePaths returns negative if a < b, 0 if equal, positive if a > b
+func comparePaths(a, b []int) int {
+	minLen := len(a)
+	if len(b) < minLen {
+		minLen = len(b)
+	}
+	for i := 0; i < minLen; i++ {
+		if a[i] != b[i] {
+			return a[i] - b[i]
+		}
+	}
+	return len(a) - len(b)
+}
+
+// BuildFromLeaves constructs the tree from data (hashed via HashFunc).
+func (t *Tree) BuildFromLeaves(leaves [][]byte) error { return nil }
+
+// Append adds leaves and updates the tree incrementally.
+// TODO
+func (t *Tree) Append(data ...[]byte) error { return nil }
+
+// Add adds a node with its path. Does not check for duplicates.
+func (t *Tree) Add(path []int, digest []byte) {
+	t.Nodes = append(t.Nodes, Node{
+		Path:   append([]int(nil), path...), // copy
+		Digest: append([]byte(nil), digest...),
+	})
+}
+
+// RootHash returns the current root hash.
+func (t *Tree) RootHash() []byte {
+	if t.Root == nil {
+		return nil
+	}
+	return t.Root.Digest
+}
+
+// Size returns the number of leaves.
+func (t *Tree) Size() int { return len(t.leaves) }
+
+// Get returns the node at leaf index.
+func (t *Tree) Get(index int) (*Node, error)
+
+// GenerateInclusionProof returns a proof for the leaf at index.
+func (t *Tree) GenerateInclusionProof(index int) (*InclusionProof, error) {
+	return nil, nil
+}
+
+// InclusionProof proves a leaf is in the tree.
+type InclusionProof struct {
+	LeafHash []byte
+	Path     []ProofElement
+	Hash     crypto.Hash
+}
+
+// ProofElement is one step in an inclusion path.
+type ProofElement struct {
+	Hash     []byte // sibling subtree hash
+	Position int    // index in parent (0..Arity-1)
+}
+
+// VerifyInclusion checks an inclusion proof against a known root.
+func VerifyInclusion(proof *InclusionProof, root []byte) (bool, error) {
+	return false, nil
+}
+
+// ConsistencyProof proves one tree is a consistent extension of another.
+type ConsistencyProof struct {
+	OldSize int
+	Hashes  [][]byte
+}
+
+// GenerateConsistencyProof returns a proof that the current tree
+// is a consistent append of a previous tree of size oldSize.
+func (t *Tree) GenerateConsistencyProof(oldSize int) (*ConsistencyProof, error) {
+	return nil, nil
+}
+
+// VerifyConsistency verifies that rootB is a consistent extension of rootA.
+func VerifyConsistency(rootA []byte, sizeA int, rootB []byte, sizeB int, proof *ConsistencyProof) (bool, error) {
+	return false, nil
+}
+
+// Errors
+var (
+	ErrInvalidParam    = &Error{"invalid parameter"}
+	ErrIndexOutOfRange = &Error{"index out of range"}
+	ErrInvalidProof    = &Error{"invalid proof"}
+)
+
+type Error struct{ msg string }
+
+func (e *Error) Error() string { return e.msg }
