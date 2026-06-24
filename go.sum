@@ -1,0 +1,8 @@
+github.com/cyphrme/coz v1.0.3-0.20260513183839-1a091ab9a83b h1:7IMOcMh380n0W33wB8mzIuZuIAzgPZs1y54gjCNODFA=
+github.com/cyphrme/coz v1.0.3-0.20260513183839-1a091ab9a83b/go.mod h1:8IKpXO/Be20+IycrRTBTgHlYgV+RsGAxupBxwIf7ads=
+golang.org/x/crypto v0.46.0 h1:cKRW/pmt1pKAfetfu+RCEvjvZkA9RimPbh7bhFjGVBU=
+golang.org/x/crypto v0.46.0/go.mod h1:Evb/oLKmMraqjZ2iQTwDwvCtJkczlDuTmdJXoZVzqU0=
+golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e h1:+WEEuIdZHnUeJJmEUjyYC2gfUMj69yZXw17EnHg/otA=
+golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e/go.mod h1:Kr81I6Kryrl9sr8s2FK3vxD90NdsKWRuOIl2O4CvYbA=
+golang.org/x/sys v0.39.0 h1:CvCKL8MeisomCi6qNZ+wbb0DN9E5AATixKsvNtMoMFk=
+golang.org/x/sys v0.39.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=

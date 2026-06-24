@@ -23,6 +23,8 @@ import (
 	"crypto"
 	"encoding/json"
 	"sort"
+
+	"github.com/cyphrme/coz" // imported for base64
 )
 
 // Global options
@@ -53,17 +55,15 @@ type Path []int
 type LeafSerial int
 
 // Null represents an empty value node.
-var Null = []byte{}
+var Null coz.B64
 
 // Node is a tree node (root, internal, or leaf). The hashing algorithm of a
-// node is defined by the containing tree.  A node is null when Digest == nil. A null
+// node is defined by the containing tree. A node is null when Digest == nil.
 type Node struct {
-	Digest   []byte
-	Children []*Node // Nodes are ordered.
-	Path             // Path may be unknown (nil)
-
-	// Metadata or Derived values
-	Arity int // Number of children. Arity is metadata and may be unknown, which is 0.
+	Digest   coz.B64 `json:"digest,omitempty"`
+	Children []*Node `json:"-"` // Nodes are ordered.
+	Path     Path    `json:"path,omitempty"`
+	Arity    int     `json:"arity,omitempty"` // Number of children. Arity is metadata and may be unknown, which is 0.
 
 	// TODO
 	// LeafSerial int // The leaf number may not be calculated.  If value == 0, this isn't calculated.
@@ -71,13 +71,13 @@ type Node struct {
 
 // Tree is an n-ary Merkle Tree.
 type Tree struct {
-	Hash  crypto.Hash
-	Nodes []Node // Nodes includes root.
-	Root  *Node
+	Hash  crypto.Hash `json:"hash"`
+	Nodes []Node      `json:"nodes,omitempty"` // Nodes includes root.
+	Root  *Node       `json:"-"`
 
 	// Derived values
-	leaves      []*Node // Leaves.  May be empty if uncalculated.
-	leafDigests []*byte // hashed leaves.  May be empty.  If empty, leaves has not been calculated or tree is of size 1.
+	leaves      []*Node    // Leaves.  May be empty if uncalculated.
+	leafDigests []*coz.B64 // hashed leaves.  May be empty.  If empty, leaves has not been calculated or tree is of size 1.
 
 }
 
@@ -133,15 +133,15 @@ func (t *Tree) BuildFromLeaves(leaves [][]byte) error { return nil }
 func (t *Tree) Append(data ...[]byte) error { return nil }
 
 // Add adds a node with its path. Does not check for duplicates.
-func (t *Tree) Add(path []int, digest []byte) {
+func (t *Tree) Add(path []int, digest coz.B64) {
 	t.Nodes = append(t.Nodes, Node{
 		Path:   append([]int(nil), path...), // copy
-		Digest: append([]byte(nil), digest...),
+		Digest: append(coz.B64(nil), digest...),
 	})
 }
 
 // RootHash returns the current root hash.
-func (t *Tree) RootHash() []byte {
+func (t *Tree) RootHash() coz.B64 {
 	if t.Root == nil {
 		return nil
 	}
