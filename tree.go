@@ -51,9 +51,6 @@ var (
 //	]
 type Path []int
 
-// Leaf number from left to right.
-type LeafSerial int
-
 // Null represents an empty value node.
 var Null coz.B64
 
@@ -66,7 +63,8 @@ type Node struct {
 	Arity    int     `json:"arity,omitempty"` // Number of children. Arity is metadata and may be unknown, which is 0.
 
 	// TODO
-	// LeafSerial int // The leaf number may not be calculated.  If value == 0, this isn't calculated.
+	// The leaf serial number from left to right. May not be calculated.  If value == 0, this isn't calculated.
+	// LeafSerial int
 }
 
 // Tree is an n-ary Merkle Tree.
@@ -125,7 +123,7 @@ func comparePaths(a, b []int) int {
 	return len(a) - len(b)
 }
 
-// BuildFromLeaves constructs the tree from data (hashed via HashFunc).
+// BuildFromLeaves constructs a tree from given digests.
 func (t *Tree) BuildFromLeaves(leaves [][]byte) error { return nil }
 
 // Append adds leaves and updates the tree incrementally.
