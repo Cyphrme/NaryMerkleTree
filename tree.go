@@ -115,7 +115,7 @@ func (t *Tree) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	t.Sort()
-	return nil
+	return t.Rebuild()
 }
 
 // comparePaths returns negative if a < b, 0 if equal, positive if a > b
@@ -132,19 +132,20 @@ func comparePaths(a, b []int) int {
 	return len(a) - len(b)
 }
 
-// BuildFromLeaves constructs a tree from given digests.
-func (t *Tree) BuildFromLeaves(leaves []byte) error { return nil }
+// BuildFromLeaves constructs a tree from given leaf payloads.
+func (t *Tree) BuildFromLeaves(leaves [][]byte) error { return nil }
 
 // Append adds leaves and updates the tree incrementally.
 // TODO
 func (t *Tree) Append(data ...[]byte) error { return nil }
 
 // Add adds a node with its path. Does not check for duplicates.
-func (t *Tree) Add(path []int, digest coz.B64) {
+func (t *Tree) Add(path []int, digest coz.B64) error {
 	t.Nodes = append(t.Nodes, Node{
 		Path:   append([]int(nil), path...), // copy
 		Digest: append(coz.B64(nil), digest...),
 	})
+	return t.Rebuild()
 }
 
 // RootHash returns the current root hash.
@@ -161,8 +162,13 @@ func (t *Tree) Size() int {
 	return len(t.leaves)
 }
 
-// Get returns the node at leaf index.
-func (t *Tree) Get(index int) (*Node, error) { return nil, nil }
+// Get returns the leaf at index (left-to-right path order).
+func (t *Tree) Get(index int) (*Node, error) {
+	if index < 0 || index >= len(t.leaves) {
+		return nil, ErrIndexOutOfRange
+	}
+	return t.leaves[index], nil
+}
 
 // Errors
 var (

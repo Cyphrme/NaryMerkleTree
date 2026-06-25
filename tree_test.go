@@ -62,11 +62,21 @@ func TestAddSortPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tree.Add([]int{}, sha256Sum([]byte("a")))
-	tree.Add([]int{1}, sha256Sum([]byte("c")))
-	tree.Add([]int{0}, sha256Sum([]byte("b")))
-	tree.Add([]int{0, 1}, sha256Sum([]byte("d")))
-	tree.Add([]int{0, 0}, sha256Sum([]byte("e")))
+	if err := tree.Add([]int{}, sha256Sum([]byte("a"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := tree.Add([]int{1}, sha256Sum([]byte("c"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := tree.Add([]int{0}, sha256Sum([]byte("b"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := tree.Add([]int{0, 1}, sha256Sum([]byte("d"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := tree.Add([]int{0, 0}, sha256Sum([]byte("e"))); err != nil {
+		t.Fatal(err)
+	}
 	tree.Sort()
 
 	wantPaths := [][]int{
@@ -92,9 +102,15 @@ func TestMarshalJSONDeterministicSHA256(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tree.Add([]int{1}, sha256Sum([]byte("leaf-1")))
-	tree.Add([]int{0}, sha256Sum([]byte("leaf-0")))
-	tree.Add([]int{0, 1}, sha256Sum([]byte("leaf-0-1")))
+	if err := tree.Add([]int{1}, sha256Sum([]byte("leaf-1"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := tree.Add([]int{0}, sha256Sum([]byte("leaf-0"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := tree.Add([]int{0, 1}, sha256Sum([]byte("leaf-0-1"))); err != nil {
+		t.Fatal(err)
+	}
 
 	first, err := tree.MarshalJSON()
 	if err != nil {
@@ -122,20 +138,31 @@ func TestMarshalJSONDeterministicSHA256(t *testing.T) {
 	if decoded.Hash != crypto.SHA256 {
 		t.Fatalf("decoded.Hash = %v, want crypto.SHA256", decoded.Hash)
 	}
-	if len(decoded.Nodes) != 3 {
-		t.Fatalf("decoded.Nodes len = %d, want 3", len(decoded.Nodes))
+	if len(decoded.Nodes) != 4 {
+		t.Fatalf("decoded.Nodes len = %d, want 4 (root + 3 leaves)", len(decoded.Nodes))
 	}
 
+	leaf01 := sha256Sum([]byte("leaf-0-1"))
+	leaf1 := sha256Sum([]byte("leaf-1"))
+	nullD := sha256Sum(nil)
+	inner0 := sha256Sum(append(append([]byte{}, nullD...), leaf01...))
 	wantDigests := map[string]coz.B64{
-		"[0]":    sha256Sum([]byte("leaf-0")),
-		"[1]":    sha256Sum([]byte("leaf-1")),
-		"[0,1]":  sha256Sum([]byte("leaf-0-1")),
+		"[]":    nil, // computed root
+		"[0]":   inner0, // internal: null-padded [0] + child [0,1]
+		"[1]":   leaf1,
+		"[0,1]": leaf01,
 	}
 	for _, node := range decoded.Nodes {
 		key := pathKey(node.Path)
 		want, ok := wantDigests[key]
 		if !ok {
 			t.Fatalf("unexpected path %v in decoded JSON", node.Path)
+		}
+		if key == "[]" {
+			if node.Digest == nil {
+				t.Fatalf("root digest should be computed after unmarshal rebuild")
+			}
+			continue
 		}
 		if !bytes.Equal(node.Digest, want) {
 			t.Fatalf("digest for %s = %s, want %s", key, node.Digest, want)
@@ -155,10 +182,3 @@ func pathsEqual(a, b []int) bool {
 	return true
 }
 
-func pathKey(path Path) string {
-	b, err := json.Marshal(path)
-	if err != nil {
-		panic(err)
-	}
-	return string(b)
-}
