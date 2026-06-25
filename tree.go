@@ -58,22 +58,35 @@ var Null coz.B64
 // node is defined by the containing tree. A node is null when Digest == nil.
 type Node struct {
 	Digest   coz.B64 `json:"digest,omitempty"`
-	Children []*Node `json:"-"` // Nodes are ordered.
-	Path     Path    `json:"path,omitempty"`
-	Arity    int     `json:"arity,omitempty"` // Number of children. Arity is metadata and may be unknown, which is 0.
+	Children []*Node `json:"-"`              // Nodes are positionally ordered.
+	Path     Path    `json:"path,omitempty"` // May be empty
+
+	//Arity int `json:"arity,omitempty"` // Number of children. Arity is metadata and may be unknown, which is 0.
 
 	// TODO
 	// The leaf serial number from left to right. May not be calculated.  If value == 0, this isn't calculated.
 	// LeafSerial int
+
+	// Append only is an option to set this node as only forward mutable, "append
+	// only log" on a per leaf basis.  Existing leaves are immutable and new leaf
+	// insert is only allowed on the furthest right edge.  Leaves may not be
+	// inserted anywhere between existing leaves.
+	AppendOnly bool
 }
 
 // Tree is an n-ary Merkle Tree.
+//
+// Assumes there is one hash for the whole tree.
 type Tree struct {
 	Hash  crypto.Hash `json:"hash"`
+	Arity int         `json:"arity,omitempty"` // k-ary fanout; 0 or 1 means unbounded root children.
 	Nodes []Node      `json:"nodes,omitempty"` // Nodes includes root.
 	Root  *Node       `json:"-"`
 
-	// Derived values
+	// AppendOnly restricts Add to the next append-order leaf path.
+	AppendOnly bool `json:"append_only,omitempty"`
+
+	// Derived values, Nodes remains the source of truth.
 	leaves      []*Node    // Leaves.  May be empty if uncalculated.
 	leafDigests []*coz.B64 // hashed leaves.  May be empty.  If empty, leaves has not been calculated or tree is of size 1.
 
@@ -106,7 +119,7 @@ func (t *Tree) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	t.Sort()
-	return nil
+	return t.Rebuild()
 }
 
 // comparePaths returns negative if a < b, 0 if equal, positive if a > b
@@ -123,19 +136,22 @@ func comparePaths(a, b []int) int {
 	return len(a) - len(b)
 }
 
-// BuildFromLeaves constructs a tree from given digests.
-func (t *Tree) BuildFromLeaves(leaves [][]byte) error { return nil }
-
-// Append adds leaves and updates the tree incrementally.
-// TODO
-func (t *Tree) Append(data ...[]byte) error { return nil }
-
 // Add adds a node with its path. Does not check for duplicates.
-func (t *Tree) Add(path []int, digest coz.B64) {
+func (t *Tree) Add(path []int, digest coz.B64) error {
+	if t.AppendOnly {
+		next, err := t.nextLeafPath()
+		if err != nil {
+			return err
+		}
+		if !pathsEqual(Path(path), next) {
+			return ErrAppendOnly
+		}
+	}
 	t.Nodes = append(t.Nodes, Node{
 		Path:   append([]int(nil), path...), // copy
 		Digest: append(coz.B64(nil), digest...),
 	})
+	return t.Rebuild()
 }
 
 // RootHash returns the current root hash.
@@ -152,14 +168,21 @@ func (t *Tree) Size() int {
 	return len(t.leaves)
 }
 
-// Get returns the node at leaf index.
-func (t *Tree) Get(index int) (*Node, error) { return nil, nil }
+// Get returns the leaf at index (left-to-right path order).
+func (t *Tree) Get(index int) (*Node, error) {
+	if index < 0 || index >= len(t.leaves) {
+		return nil, ErrIndexOutOfRange
+	}
+	return t.leaves[index], nil
+}
 
 // Errors
 var (
-	ErrInvalidParam    = &Error{"invalid parameter"}
-	ErrIndexOutOfRange = &Error{"index out of range"}
-	ErrInvalidProof    = &Error{"invalid proof"}
+	ErrInvalidParam      = &Error{"invalid parameter"}
+	ErrIndexOutOfRange   = &Error{"index out of range"}
+	ErrInvalidProof      = &Error{"invalid proof"}
+	ErrAppendOnly        = &Error{"append only: path must be next leaf position"}
+	ErrAppendRestructure = &Error{"append would restructure k-ary leaf paths"}
 )
 
 type Error struct{ msg string }
