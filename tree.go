@@ -61,27 +61,22 @@ type Node struct {
 	Children []*Node `json:"-"`              // Nodes are positionally ordered.
 	Path     Path    `json:"path,omitempty"` // May be empty
 
-	// Append only is an option to set this node as only forward mutable, "append
-	// only log" on a per leaf basis.  Existing leaves are immutable and new leaf
-	// insert is only allowed on the furthest right edge.  Leaves may not be
-	// inserted anywhere between existing leaves.
-	AppendOnly bool
 }
 
 // Tree is an n-ary Merkle Tree.
 //
 // Assumes there is one hash for the whole tree.
 type Tree struct {
-	Hash  crypto.Hash `json:"hash"`
+	Hash crypto.Hash `json:"hash"`
 	// Arity controls append-only leaf placement. 0 or 1 is n-ary: leaves are
 	// direct root children [0..n-1]. Values >= 2 fix a static k-ary layout for
 	// BuildFromLeaves and Append. Internal fanout at each node is determined by
 	// child paths during Rebuild(), not by Arity.
-	Arity int `json:"arity,omitempty"`
-	Nodes []Node      `json:"nodes,omitempty"` // Nodes includes root.
-	Root  *Node       `json:"-"`
+	Arity int    `json:"arity,omitempty"`
+	Nodes []Node `json:"nodes,omitempty"` // Nodes includes root.
+	Root  *Node  `json:"-"`
 
-	// AppendOnly restricts Add to the next append-order leaf path.
+	// AppendOnly restricts Add and Append to the next append-order leaf path.
 	AppendOnly bool `json:"append_only,omitempty"`
 
 	// Derived values, Nodes remains the source of truth.

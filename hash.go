@@ -198,9 +198,8 @@ func (t *Tree) Rebuild() error {
 	for _, n := range t.Nodes {
 		key := pathKey(n.Path)
 		nodeMap[key] = &Node{
-			Digest:     append(coz.B64(nil), n.Digest...),
-			Path:       append(Path(nil), n.Path...),
-			AppendOnly: n.AppendOnly,
+			Digest: append(coz.B64(nil), n.Digest...),
+			Path:   append(Path(nil), n.Path...),
 		}
 	}
 	for _, p := range paths {
@@ -245,9 +244,8 @@ func (t *Tree) Rebuild() error {
 	for _, p := range paths {
 		n := nodeMap[pathKey(p)]
 		t.Nodes = append(t.Nodes, Node{
-			Digest:     append(coz.B64(nil), n.Digest...),
-			Path:       append(Path(nil), n.Path...),
-			AppendOnly: n.AppendOnly,
+			Digest: append(coz.B64(nil), n.Digest...),
+			Path:   append(Path(nil), n.Path...),
 		})
 	}
 	t.Sort()

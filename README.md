@@ -5,12 +5,8 @@ Cyphr-specific optimizations (singleton promotion, collapse, null nodes).
 
 This library supports arbitrary inserts.
 
-
-
 This library may be used with the Merkle Mountain Range wrapper, which then may
-be wrapped by the multi-hash Epoch Merkle Log
-
-
+be wrapped by the multi-hash Epoch Merkle Log.
 
 ## Hash algorithm
 
@@ -18,18 +14,18 @@ Nodes are stored flat by `path` and linked on `Rebuild()`. A **leaf** is any
 node whose path is not a prefix of another node's path. Internal digests are
 computed bottom-up from children in index order.
 
-| Condition | Parent digest |
-|-----------|---------------|
-| All children null (`Digest == nil`) | null |
-| `Promote` and one child | child's effective digest (no rehash) |
-| `Collapse` and all children equal | that digest (no rehash) |
-| Otherwise | `hash(concat(child digests in index order))` |
+`Promote` and `Collapse` are package-level toggles (both default to `true`).
+
+| Condition                           | Parent digest                          |
+|-------------------------------------|--------------------------------------  |
+| All children null                   | null                                   |
+| `Promote` (one child)               | child's effective digest (no rehash)   |
+| `Collapse` (all children equal)     | repeat digest (no rehash)              |
+| Default                             | `hash(concat(digests in index order))` |
 
 A **null** node has `Digest == nil`. When combined with non-null siblings, null
 children contribute the **null digest** `hash("")`. Missing child indices are
 treated as null nodes (left-filled convention).
-
-`Promote` and `Collapse` are package-level toggles (both default to `true`).
 
 **Arity** is a tree-level setting for append-only leaf placement (`Tree.Arity`).
 `0` or `1` is n-ary (leaves are root children `[0..n-1]`). `>= 2` is k-ary
@@ -53,8 +49,9 @@ value without addition hashing. (Option may be turned off)
 rooted with a non-null value.  The null digest value is calculated as digest =
 hash(). 
 
-**Append only** is an option to set this node as only forward mutable.  However,
-there are a few ways to design forward immutability
+**Append only** is a tree-level option (`Tree.AppendOnly`) that restricts inserts
+to the next leaf position.  More broadly, there are a few ways to design forward
+immutability
 
 0. **Right insert anywhere** - A new leaf may be inserted in the tree as a new
    node to the right.  The value of the target node (parent/root) itself is
