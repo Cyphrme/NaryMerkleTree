@@ -3,14 +3,42 @@
 A Go library for an n-ary Merkle tree with inclusion/consistency proofs, plus
 Cyphr-specific optimizations (singleton promotion, collapse, null nodes).
 
-This library supports arbitrary inserts, however the parent must be defined first. A null parent 
+This library supports arbitrary inserts.
 
 
 
-This library my be used with the Merkle Mountain Range wrapper, which then may
+This library may be used with the Merkle Mountain Range wrapper, which then may
 be wrapped by the multi-hash Epoch Merkle Log
 
 
+
+## Hash algorithm
+
+Nodes are stored flat by `path` and linked on `Rebuild()`. A **leaf** is any
+node whose path is not a prefix of another node's path. Internal digests are
+computed bottom-up from children in index order.
+
+| Condition | Parent digest |
+|-----------|---------------|
+| All children null (`Digest == nil`) | null |
+| `Promote` and one child | child's effective digest (no rehash) |
+| `Collapse` and all children equal | that digest (no rehash) |
+| Otherwise | `hash(concat(child digests in index order))` |
+
+A **null** node has `Digest == nil`. When combined with non-null siblings, null
+children contribute the **null digest** `hash("")`. Missing child indices are
+treated as null nodes (left-filled convention).
+
+`Promote` and `Collapse` are package-level toggles (both default to `true`).
+
+**Arity** is a tree-level setting for append-only leaf placement (`Tree.Arity`).
+`0` or `1` is n-ary (leaves are root children `[0..n-1]`). `>= 2` is k-ary
+for `BuildFromLeaves` / `Append`. Actual fanout at each internal node follows
+the paths present in the tree.
+
+**Proofs:** inclusion proofs replay `digestChildren` per level. Consistency
+proofs use a binary-composed MTH over leaf order (RFC 6962 §2.1.3) and require
+flat append layout (`Arity <= 1`).
 
 ## Nomenclature
 **N-ary** - This library is n-ary meaning dynamic arity.  Also support k-ary (static arity).
@@ -21,8 +49,8 @@ child's value without addition hashing. (May be turned off)
 **Collapse** If all children have the same value, the parent assumes the child's
 value without addition hashing. (Option may be turned off)
 
-**Null** a node with no value.  A null node's value must be a "null digest" when
-rooted with a non-null value, which is calculated as digest =
+**Null** a node with no value.  A null node's must be a "null digest" when
+rooted with a non-null value.  The null digest value is calculated as digest =
 hash(). 
 
 **Append only** is an option to set this node as only forward mutable.  However,
@@ -59,6 +87,9 @@ symmetrical tree is balanced, balances carries more of the connotation that a su
  - [N-ary Merkle Tree (this repo)](https://github.com/Cyphrme/NaryMerkleTree) - The n-ary Merkle tree.
  - [Tree](https://github.com/Cyphrme/Tree) - Digest tree, aka the **reverse Merkle tree**
  - [Cyphr](https://github.com/Cyphrme/Cyphr) - The n-ary Merkle tree is a foundational primitive for Cyphr.
+ - **Merkle Mountain Ranges**
+   - [Merkle Mountain Ranges for Performant Data Authentication](https://commonware.xyz/blogs/mmr)
+   - [2025 Merkle Mountain Ranges are Optimal: On Witness Update Frequency for Cryptographic Accumulators](https://eprint.iacr.org/2025/234.pdf)
 
 
 Project sponsored by Cyphr.me
