@@ -61,12 +61,6 @@ type Node struct {
 	Children []*Node `json:"-"`              // Nodes are positionally ordered.
 	Path     Path    `json:"path,omitempty"` // May be empty
 
-	//Arity int `json:"arity,omitempty"` // Number of children. Arity is metadata and may be unknown, which is 0.
-
-	// TODO
-	// The leaf serial number from left to right. May not be calculated.  If value == 0, this isn't calculated.
-	// LeafSerial int
-
 	// Append only is an option to set this node as only forward mutable, "append
 	// only log" on a per leaf basis.  Existing leaves are immutable and new leaf
 	// insert is only allowed on the furthest right edge.  Leaves may not be
@@ -79,7 +73,11 @@ type Node struct {
 // Assumes there is one hash for the whole tree.
 type Tree struct {
 	Hash  crypto.Hash `json:"hash"`
-	Arity int         `json:"arity,omitempty"` // k-ary fanout; 0 or 1 means unbounded root children.
+	// Arity controls append-only leaf placement. 0 or 1 is n-ary: leaves are
+	// direct root children [0..n-1]. Values >= 2 fix a static k-ary layout for
+	// BuildFromLeaves and Append. Internal fanout at each node is determined by
+	// child paths during Rebuild(), not by Arity.
+	Arity int `json:"arity,omitempty"`
 	Nodes []Node      `json:"nodes,omitempty"` // Nodes includes root.
 	Root  *Node       `json:"-"`
 
