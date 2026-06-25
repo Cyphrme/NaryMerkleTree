@@ -8,8 +8,8 @@
 // proofs.
 //
 // Supports
-//   - Singleton Promotion: If a node has only one child, the parent assumes the
-//     value of the child without rehashing. Shorthand: "promotion".
+//   - Singleton Promotion (shorthand: "promotion): If a node has only one
+//     child, the parent assumes the value of the child without rehashing.
 //   - Collapse: if all children are the same value, the parent assumes that
 //     value without re-hashing; mostly useful for null values
 //   - Null node values (including promotion and collapse). A null parent may
@@ -55,28 +55,28 @@ type Path []int
 var Null coz.B64
 
 // Node is a tree node (root, internal, or leaf). The hashing algorithm of a
-// node is defined by the containing tree. A node is null when Digest == nil.
+// node is defined by the containing tree. For this library, a node is null when
+// Digest == nil.
 type Node struct {
 	Digest   coz.B64 `json:"digest,omitempty"`
 	Children []*Node `json:"-"`              // Nodes are positionally ordered.
 	Path     Path    `json:"path,omitempty"` // May be empty
-
 }
 
 // Tree is an n-ary Merkle Tree.
 //
 // Assumes there is one hash for the whole tree.
 type Tree struct {
-	Hash crypto.Hash `json:"hash"`
+	Hash  crypto.Hash `json:"hash"`
+	Nodes []Node      `json:"nodes,omitempty"` // Nodes includes root.
+	Root  *Node       `json:"-"`
+
 	// Arity controls append-only leaf placement. 0 or 1 is n-ary: leaves are
 	// direct root children [0..n-1]. Values >= 2 fix a static k-ary layout for
 	// BuildFromLeaves and Append. Internal fanout at each node is determined by
 	// child paths during Rebuild(), not by Arity.
-	Arity int    `json:"arity,omitempty"`
-	Nodes []Node `json:"nodes,omitempty"` // Nodes includes root.
-	Root  *Node  `json:"-"`
-
-	// AppendOnly restricts Add and Append to the next append-order leaf path.
+	Arity int `json:"arity,omitempty"`
+	// AppendOnly restricts Add to the next append-order leaf path.
 	AppendOnly bool `json:"append_only,omitempty"`
 
 	// Derived values, Nodes remains the source of truth.

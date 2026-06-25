@@ -5,6 +5,10 @@ Cyphr-specific optimizations (singleton promotion, collapse, null nodes).
 
 This library supports arbitrary inserts.
 
+This library has no support for "prefixes", which we consider to be an
+anti-pattern, and instead uses pure hashing. If you need prefixes, you need to
+manually add them to the preimage yourself.
+
 This library may be used with the Merkle Mountain Range wrapper, which then may
 be wrapped by the multi-hash Epoch Merkle Log.
 
