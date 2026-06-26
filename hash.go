@@ -181,12 +181,21 @@ func gatherChildren(parent Path, nodeMap map[string]*Node, paths []Path) []*Node
 	return children
 }
 
-// Rebuild constructs the linked tree from flat Nodes, computes internal
-// digests bottom-up, and refreshes Root and leaves.
+func (t *Tree) digestAt(path Path) coz.B64 {
+	key := pathKey(path)
+	for _, n := range t.Nodes {
+		if pathKey(n.Path) == key {
+			return n.Digest
+		}
+	}
+	return nil
+}
+
+// Rebuild computes internal digests bottom-up from flat Nodes and refreshes
+// derived leaf metadata. The root lives at path [] in Nodes.
 func (t *Tree) Rebuild() error {
 	if len(t.Nodes) == 0 {
-		t.Root = nil
-		t.leaves = nil
+		t.leafPaths = nil
 		t.leafDigests = nil
 		return nil
 	}
@@ -225,20 +234,6 @@ func (t *Tree) Rebuild() error {
 		n.Digest = digest
 	}
 
-	// Link non-internal nodes and clear stale children.
-	for _, p := range paths {
-		key := pathKey(p)
-		n := nodeMap[key]
-		if isInternal(p, paths) {
-			n.Children = gatherChildren(p, nodeMap, paths)
-		} else {
-			n.Children = nil
-		}
-	}
-
-	rootKey := pathKey(Path{})
-	t.Root = nodeMap[rootKey]
-
 	// Sync flat Nodes from nodeMap (includes implicit ancestors).
 	t.Nodes = make([]Node, 0, len(nodeMap))
 	for _, p := range paths {
@@ -251,20 +246,20 @@ func (t *Tree) Rebuild() error {
 	t.Sort()
 
 	// Leaves: paths that are not prefixes of any deeper path.
-	var leaves []*Node
+	var leafPaths []Path
 	for _, p := range paths {
 		if isInternal(p, paths) {
 			continue
 		}
-		leaves = append(leaves, nodeMap[pathKey(p)])
+		leafPaths = append(leafPaths, append(Path(nil), p...))
 	}
 
-	t.leaves = leaves
-	t.leafDigests = make([]*coz.B64, len(leaves))
-	for i, leaf := range leaves {
-		if leaf.Digest != nil {
-			d := append(coz.B64(nil), leaf.Digest...)
-			t.leafDigests[i] = &d
+	t.leafPaths = leafPaths
+	t.leafDigests = make([]*coz.B64, len(leafPaths))
+	for i, p := range leafPaths {
+		if d := nodeMap[pathKey(p)].Digest; d != nil {
+			digest := append(coz.B64(nil), d...)
+			t.leafDigests[i] = &digest
 		}
 	}
 

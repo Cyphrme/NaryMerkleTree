@@ -59,7 +59,7 @@ func indexToPath(index, depth, arity int) Path {
 }
 
 func (t *Tree) nextLeafPath() (Path, error) {
-	n := len(t.leaves)
+	n := len(t.leafPaths)
 	paths := leafPaths(n+1, t.Arity)
 	if len(paths) <= n {
 		return nil, ErrInvalidParam
@@ -106,8 +106,7 @@ func (t *Tree) hashLeaf(data []byte) (coz.B64, error) {
 // BuildFromLeaves replaces the tree with an append-order log built from payloads.
 func (t *Tree) BuildFromLeaves(leaves [][]byte) error {
 	t.Nodes = nil
-	t.Root = nil
-	t.leaves = nil
+	t.leafPaths = nil
 	t.leafDigests = nil
 
 	if len(leaves) == 0 {
@@ -142,7 +141,7 @@ func (t *Tree) Append(data ...[]byte) error {
 			return err
 		}
 
-		if !pathsCompatible(len(t.leaves), len(t.leaves)+1, t.Arity) {
+		if !pathsCompatible(len(t.leafPaths), len(t.leafPaths)+1, t.Arity) {
 			return ErrAppendRestructure
 		}
 

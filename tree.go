@@ -68,8 +68,7 @@ type Node struct {
 // Assumes there is one hash for the whole tree.
 type Tree struct {
 	Hash  crypto.Hash `json:"hash"`
-	Nodes []Node      `json:"nodes,omitempty"` // Nodes includes root.
-	Root  *Node       `json:"-"`
+	Nodes []Node      `json:"nodes,omitempty"` // Nodes includes root at path [].
 
 	// Arity controls append-only leaf placement. 0 or 1 is n-ary: leaves are
 	// direct root children [0..n-1]. Values >= 2 fix a static k-ary layout for
@@ -79,9 +78,9 @@ type Tree struct {
 	// AppendOnly restricts Add to the next append-order leaf path.
 	AppendOnly bool `json:"append_only,omitempty"`
 
-	// Derived values, Nodes remains the source of truth.
-	leaves      []*Node    // Leaves.  May be empty if uncalculated.
-	leafDigests []*coz.B64 // hashed leaves.  May be empty.  If empty, leaves has not been calculated or tree is of size 1.
+	// Derived values; Nodes remains the source of truth.
+	leafPaths   []Path     // Left-to-right leaf paths. Empty if uncalculated.
+	leafDigests []*coz.B64 // Hashed leaves aligned with leafPaths.
 
 }
 
@@ -147,26 +146,26 @@ func (t *Tree) Add(path []int, digest coz.B64) error {
 	return t.Rebuild()
 }
 
-// RootHash returns the current root hash.
+// RootHash returns the current root hash (path [] in Nodes).
 func (t *Tree) RootHash() coz.B64 {
-	if t.Root == nil {
-		return nil
-	}
-	return t.Root.Digest
+	return t.digestAt(Path{})
 }
 
 // Size returns the number of leaves.
 func (t *Tree) Size() int {
-
-	return len(t.leaves)
+	return len(t.leafPaths)
 }
 
 // Get returns the leaf at index (left-to-right path order).
 func (t *Tree) Get(index int) (*Node, error) {
-	if index < 0 || index >= len(t.leaves) {
+	if index < 0 || index >= len(t.leafPaths) {
 		return nil, ErrIndexOutOfRange
 	}
-	return t.leaves[index], nil
+	path := t.leafPaths[index]
+	return &Node{
+		Path:   append(Path(nil), path...),
+		Digest: append(coz.B64(nil), t.digestAt(path)...),
+	}, nil
 }
 
 // Errors

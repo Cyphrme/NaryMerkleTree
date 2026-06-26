@@ -29,21 +29,41 @@ type ConsistencyProof struct {
 	Hashes  []coz.B64 `json:"hashes"`
 }
 
-func (t *Tree) nodeAt(path Path) *Node {
-	if t.Root == nil {
-		return nil
-	}
-	if len(path) == 0 {
-		return t.Root
-	}
-	n := t.Root
-	for _, idx := range path {
-		if n.Children == nil || idx < 0 || idx >= len(n.Children) {
-			return nil
+func (t *Tree) proofStepAt(parent Path, pos int) (ProofStep, error) {
+	paths := collectPaths(t.Nodes)
+	nodeMap := make(map[string]*Node, len(paths))
+	for _, n := range t.Nodes {
+		nodeMap[pathKey(n.Path)] = &Node{
+			Digest: append(coz.B64(nil), n.Digest...),
+			Path:   append(Path(nil), n.Path...),
 		}
-		n = n.Children[idx]
 	}
-	return n
+	for _, p := range paths {
+		key := pathKey(p)
+		if _, ok := nodeMap[key]; !ok {
+			nodeMap[key] = &Node{Path: append(Path(nil), p...)}
+		}
+	}
+
+	children := gatherChildren(parent, nodeMap, paths)
+	if children == nil {
+		return ProofStep{}, ErrInvalidProof
+	}
+	if pos < 0 || pos >= len(children) {
+		return ProofStep{}, ErrInvalidProof
+	}
+
+	step := ProofStep{
+		Position: pos,
+		Width:    len(children),
+		Slots:    make([]coz.B64, len(children)),
+	}
+	for i, child := range children {
+		if i != pos {
+			step.Slots[i] = append(coz.B64(nil), child.Digest...)
+		}
+	}
+	return step, nil
 }
 
 func (t *Tree) climbStep(accum coz.B64, step ProofStep) (coz.B64, error) {
@@ -67,7 +87,7 @@ func (t *Tree) climbStep(accum coz.B64, step ProofStep) (coz.B64, error) {
 
 // GenerateInclusionProof returns a proof for the leaf at index.
 func (t *Tree) GenerateInclusionProof(index int) (*InclusionProof, error) {
-	if t.Root == nil {
+	if len(t.Nodes) == 0 {
 		return nil, ErrInvalidParam
 	}
 	leaf, err := t.Get(index)
@@ -86,20 +106,9 @@ func (t *Tree) GenerateInclusionProof(index int) (*InclusionProof, error) {
 		parentPath := path[:len(path)-1]
 		pos := path[len(path)-1]
 
-		parent := t.nodeAt(parentPath)
-		if parent == nil || parent.Children == nil {
-			return nil, ErrInvalidProof
-		}
-
-		step := ProofStep{
-			Position: pos,
-			Width:    len(parent.Children),
-			Slots:    make([]coz.B64, len(parent.Children)),
-		}
-		for i, child := range parent.Children {
-			if i != pos {
-				step.Slots[i] = append(coz.B64(nil), child.Digest...)
-			}
+		step, err := t.proofStepAt(parentPath, pos)
+		if err != nil {
+			return nil, err
 		}
 		proof.Steps = append(proof.Steps, step)
 		path = parentPath
@@ -138,7 +147,7 @@ func (t *Tree) mthRange(start, end int) (coz.B64, error) {
 		return nil, nil
 	}
 	if n == 1 {
-		return append(coz.B64(nil), t.leaves[start].Digest...), nil
+		return append(coz.B64(nil), t.digestAt(t.leafPaths[start])...), nil
 	}
 
 	k := largestPow2LessThan(n)
