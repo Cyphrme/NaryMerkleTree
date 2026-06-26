@@ -29,11 +29,22 @@ type ConsistencyProof struct {
 	Hashes  []coz.B64 `json:"hashes"`
 }
 
-// proofStepAt builds one inclusion-proof step at parent for child position pos.
-func (t *Tree) proofStepAt(parent Path, pos int) (ProofStep, error) {
+// proofWalkState caches path layout for multi-step inclusion proof walks.
+type proofWalkState struct {
+	layout  pathLayout
+	nodeMap map[string]*Node
+}
+
+func (t *Tree) newProofWalkState() proofWalkState {
 	layout := buildPathLayout(t.Nodes)
-	nodeMap := linkedNodeMap(t.Nodes, layout.paths)
-	children := gatherChildren(parent, nodeMap, layout.maxChild)
+	return proofWalkState{
+		layout:  layout,
+		nodeMap: linkedNodeMap(t.Nodes, layout.paths),
+	}
+}
+
+func (s proofWalkState) step(parent Path, pos int) (ProofStep, error) {
+	children := gatherChildren(parent, s.nodeMap, s.layout.maxChild)
 	if children == nil {
 		return ProofStep{}, ErrInvalidProof
 	}
@@ -49,6 +60,30 @@ func (t *Tree) proofStepAt(parent Path, pos int) (ProofStep, error) {
 	for i, child := range children {
 		if i != pos {
 			step.Slots[i] = append(coz.B64(nil), child.Digest...)
+		}
+	}
+	return step, nil
+}
+
+// proofStepFlatRoot builds the single root step for flat append-only trees.
+func (t *Tree) proofStepFlatRoot(pos int) (ProofStep, error) {
+	maxIdx := flatMaxChildIndex(t.Nodes)
+	if pos < 0 || pos > maxIdx {
+		return ProofStep{}, ErrInvalidProof
+	}
+
+	width := maxIdx + 1
+	step := ProofStep{
+		Position: pos,
+		Width:    width,
+		Slots:    make([]coz.B64, width),
+	}
+	for i := 0; i < width; i++ {
+		if i == pos {
+			continue
+		}
+		if n, ok := t.Nodes[pathKey(Path{i})]; ok && n.Digest != nil {
+			step.Slots[i] = append(coz.B64(nil), n.Digest...)
 		}
 	}
 	return step, nil
@@ -90,12 +125,25 @@ func (t *Tree) GenerateInclusionProof(index int) (*InclusionProof, error) {
 		Hash:     t.Hash,
 	}
 
+	flat := t.Arity <= 1 && isFlatLayout(t.Nodes)
+	var walk *proofWalkState
+	if !flat {
+		state := t.newProofWalkState()
+		walk = &state
+	}
+
 	path := append(Path(nil), leaf.Path...)
 	for len(path) > 0 {
 		parentPath := path[:len(path)-1]
 		pos := path[len(path)-1]
 
-		step, err := t.proofStepAt(parentPath, pos)
+		var step ProofStep
+		var err error
+		if flat && len(parentPath) == 0 {
+			step, err = t.proofStepFlatRoot(pos)
+		} else {
+			step, err = walk.step(parentPath, pos)
+		}
 		if err != nil {
 			return nil, err
 		}

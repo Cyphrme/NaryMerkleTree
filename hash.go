@@ -13,6 +13,9 @@ func pathKey(path Path) string {
 	if len(path) == 0 {
 		return ""
 	}
+	if len(path) == 1 {
+		return strconv.Itoa(path[0])
+	}
 	b := make([]byte, 0, len(path)*4)
 	for i, v := range path {
 		if i > 0 {
@@ -242,6 +245,57 @@ func isFlatLayout(nodes map[string]Node) bool {
 	return true
 }
 
+// flatMaxChildIndex returns the highest root-child index among flat nodes.
+func flatMaxChildIndex(nodes map[string]Node) int {
+	maxIdx := -1
+	for _, n := range nodes {
+		if len(n.Path) == 1 && n.Path[0] > maxIdx {
+			maxIdx = n.Path[0]
+		}
+	}
+	return maxIdx
+}
+
+func (t *Tree) flatLeafCount() int {
+	count := 0
+	for _, n := range t.Nodes {
+		if len(n.Path) == 1 {
+			count++
+		}
+	}
+	return count
+}
+
+func (t *Tree) leafMetadataCurrent() bool {
+	return t.leafPaths != nil && len(t.leafPaths) == t.flatLeafCount()
+}
+
+func (t *Tree) syncLeavesFlat() {
+	type flatLeaf struct {
+		idx    int
+		digest coz.B64
+	}
+	leaves := make([]flatLeaf, 0, t.flatLeafCount())
+	for _, n := range t.Nodes {
+		if len(n.Path) == 1 {
+			leaves = append(leaves, flatLeaf{n.Path[0], n.Digest})
+		}
+	}
+	sort.Slice(leaves, func(i, j int) bool {
+		return leaves[i].idx < leaves[j].idx
+	})
+
+	t.leafPaths = make([]Path, len(leaves))
+	t.leafDigests = make([]*coz.B64, len(leaves))
+	for i, leaf := range leaves {
+		t.leafPaths[i] = Path{leaf.idx}
+		if leaf.digest != nil {
+			digest := append(coz.B64(nil), leaf.digest...)
+			t.leafDigests[i] = &digest
+		}
+	}
+}
+
 func (t *Tree) syncNodesFrom(nodeMap map[string]*Node, layout pathLayout) {
 	t.Nodes = make(map[string]Node, len(layout.paths))
 	for _, p := range layout.paths {
@@ -276,26 +330,37 @@ func (t *Tree) syncLeavesFrom(nodeMap map[string]*Node, layout pathLayout) {
 // rebuildFlat handles the common append-only case where all leaves are direct
 // root children (Arity <= 1 and no deeper paths).
 func (t *Tree) rebuildFlat() error {
-	layout := buildPathLayout(t.Nodes)
-	nodeMap := linkedNodeMap(t.Nodes, layout.paths)
-
-	rootKey := pathKey(Path{})
-	root, ok := nodeMap[rootKey]
-	if !ok {
-		root = &Node{Path: Path{}}
-		nodeMap[rootKey] = root
+	maxIdx := flatMaxChildIndex(t.Nodes)
+	if maxIdx < 0 {
+		t.leafPaths = nil
+		t.leafDigests = nil
+		delete(t.Nodes, pathKey(Path{}))
+		return nil
 	}
 
-	children := gatherChildren(Path{}, nodeMap, layout.maxChild)
-	root.Children = children
+	children := make([]*Node, maxIdx+1)
+	for i := 0; i <= maxIdx; i++ {
+		child := &Node{Path: Path{i}}
+		if n, ok := t.Nodes[pathKey(Path{i})]; ok {
+			child.Digest = n.Digest
+		}
+		children[i] = child
+	}
+
 	digest, err := t.digestChildren(children)
 	if err != nil {
 		return err
 	}
-	root.Digest = digest
 
-	t.syncNodesFrom(nodeMap, layout)
-	t.syncLeavesFrom(nodeMap, layout)
+	rootKey := pathKey(Path{})
+	root := t.Nodes[rootKey]
+	root.Path = Path{}
+	root.Digest = digest
+	t.Nodes[rootKey] = root
+
+	if !t.leafMetadataCurrent() {
+		t.syncLeavesFlat()
+	}
 	return nil
 }
 
