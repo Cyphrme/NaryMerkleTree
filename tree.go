@@ -146,8 +146,8 @@ func (t *Tree) Add(path []int, digest coz.B64) error {
 	return t.Rebuild()
 }
 
-// RootHash returns the current root hash (path [] in Nodes).
-func (t *Tree) RootHash() coz.B64 {
+// Root returns the current root digest (path [] in Nodes).
+func (t *Tree) Root() coz.B64 {
 	return t.digestAt(Path{})
 }
 

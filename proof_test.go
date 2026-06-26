@@ -29,7 +29,7 @@ func TestInclusionProofRoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GenerateInclusionProof(%d): %v", i, err)
 		}
-		ok, err := VerifyInclusion(proof, tree.RootHash())
+		ok, err := VerifyInclusion(proof, tree.Root())
 		if err != nil {
 			t.Fatalf("VerifyInclusion(%d): %v", i, err)
 		}
@@ -52,7 +52,7 @@ func TestInclusionProofPromotion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok, err := VerifyInclusion(proof, tree.RootHash())
+	ok, err := VerifyInclusion(proof, tree.Root())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestInclusionProofTampered(t *testing.T) {
 	}
 	proof.LeafHash[0] ^= 0xff
 
-	ok, err := VerifyInclusion(proof, tree.RootHash())
+	ok, err := VerifyInclusion(proof, tree.Root())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestInclusionProofArbitraryTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok, err := VerifyInclusion(proof, tree.RootHash())
+	ok, err := VerifyInclusion(proof, tree.Root())
 	if err != nil {
 		t.Fatal(err)
 	}

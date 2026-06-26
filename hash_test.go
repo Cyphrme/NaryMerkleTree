@@ -39,9 +39,9 @@ func TestPromotion(t *testing.T) {
 	leaf := sha256Sum([]byte("leaf"))
 	mustAdd(t, tree, []int{0}, leaf)
 
-	got := tree.RootHash()
+	got := tree.Root()
 	if !bytes.Equal(got, leaf) {
-		t.Fatalf("RootHash() = %s, want promoted leaf %s", got, leaf)
+		t.Fatalf("Root() = %s, want promoted leaf %s", got, leaf)
 	}
 	if tree.Size() != 1 {
 		t.Fatalf("Size() = %d, want 1", tree.Size())
@@ -67,9 +67,9 @@ func TestCollapse(t *testing.T) {
 	mustAdd(t, tree, []int{0}, d)
 	mustAdd(t, tree, []int{1}, d)
 
-	got := tree.RootHash()
+	got := tree.Root()
 	if !bytes.Equal(got, d) {
-		t.Fatalf("RootHash() = %s, want collapsed %s", got, d)
+		t.Fatalf("Root() = %s, want collapsed %s", got, d)
 	}
 }
 
@@ -98,9 +98,9 @@ func TestConcatOrder(t *testing.T) {
 	buf = append(buf, b...)
 	want := sha256Sum(buf)
 
-	got := tree.RootHash()
+	got := tree.Root()
 	if !bytes.Equal(got, want) {
-		t.Fatalf("RootHash() = %s, want %s", got, want)
+		t.Fatalf("Root() = %s, want %s", got, want)
 	}
 }
 
@@ -129,9 +129,9 @@ func TestArbitraryTree(t *testing.T) {
 	inner0 := sha256Sum(append(append([]byte{}, d00...), d01...))
 	wantRoot := sha256Sum(append(append([]byte{}, inner0...), d1...))
 
-	got := tree.RootHash()
+	got := tree.Root()
 	if !bytes.Equal(got, wantRoot) {
-		t.Fatalf("RootHash() = %s, want %s", got, wantRoot)
+		t.Fatalf("Root() = %s, want %s", got, wantRoot)
 	}
 	if tree.Size() != 3 {
 		t.Fatalf("Size() = %d, want 3", tree.Size())
@@ -160,8 +160,8 @@ func TestNullChildrenParentNull(t *testing.T) {
 	mustAdd(t, tree, []int{0}, nil)
 	mustAdd(t, tree, []int{1}, nil)
 
-	if tree.RootHash() != nil {
-		t.Fatalf("RootHash() = %s, want nil for all-null children", tree.RootHash())
+	if tree.Root() != nil {
+		t.Fatalf("Root() = %s, want nil for all-null children", tree.Root())
 	}
 }
 
@@ -173,12 +173,12 @@ func TestRebuildIdempotent(t *testing.T) {
 	mustAdd(t, tree, []int{0}, sha256Sum([]byte("a")))
 	mustAdd(t, tree, []int{1}, sha256Sum([]byte("b")))
 
-	first := append(coz.B64(nil), tree.RootHash()...)
+	first := append(coz.B64(nil), tree.Root()...)
 	if err := tree.Rebuild(); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(tree.RootHash(), first) {
-		t.Fatalf("second Rebuild changed root: %s -> %s", first, tree.RootHash())
+	if !bytes.Equal(tree.Root(), first) {
+		t.Fatalf("second Rebuild changed root: %s -> %s", first, tree.Root())
 	}
 }
 
@@ -201,8 +201,8 @@ func TestPromoteDisabled(t *testing.T) {
 	mustAdd(t, tree, []int{0}, leaf)
 
 	want := sha256Sum(append([]byte{}, leaf...))
-	got := tree.RootHash()
+	got := tree.Root()
 	if !bytes.Equal(got, want) {
-		t.Fatalf("RootHash() = %s, want hashed single child %s", got, want)
+		t.Fatalf("Root() = %s, want hashed single child %s", got, want)
 	}
 }

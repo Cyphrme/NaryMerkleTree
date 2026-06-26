@@ -58,8 +58,8 @@ func TestBuildFromLeavesFlat(t *testing.T) {
 	buf = append(buf, c...)
 	wantRoot = sha256Sum(buf)
 
-	if !bytes.Equal(tree.RootHash(), wantRoot) {
-		t.Fatalf("RootHash() = %s, want %s", tree.RootHash(), wantRoot)
+	if !bytes.Equal(tree.Root(), wantRoot) {
+		t.Fatalf("Root() = %s, want %s", tree.Root(), wantRoot)
 	}
 
 	leaf, err := tree.Get(2)
@@ -103,8 +103,8 @@ func TestBuildFromLeavesBinary(t *testing.T) {
 	inner1 := sha256Sum(append([]byte{}, c...)) // single child under [1], promote off
 	wantRoot := sha256Sum(append(append([]byte{}, inner0...), inner1...))
 
-	if !bytes.Equal(tree.RootHash(), wantRoot) {
-		t.Fatalf("RootHash() = %s, want %s", tree.RootHash(), wantRoot)
+	if !bytes.Equal(tree.Root(), wantRoot) {
+		t.Fatalf("Root() = %s, want %s", tree.Root(), wantRoot)
 	}
 }
 
@@ -134,8 +134,8 @@ func TestAppendFlat(t *testing.T) {
 	buf = append(buf, c...)
 	wantRoot := sha256Sum(buf)
 
-	if !bytes.Equal(tree.RootHash(), wantRoot) {
-		t.Fatalf("RootHash() = %s, want %s", tree.RootHash(), wantRoot)
+	if !bytes.Equal(tree.Root(), wantRoot) {
+		t.Fatalf("Root() = %s, want %s", tree.Root(), wantRoot)
 	}
 }
 
@@ -159,7 +159,7 @@ func TestAppendBinaryCompatible(t *testing.T) {
 	if err := tree.BuildFromLeaves(leaves); err != nil {
 		t.Fatal(err)
 	}
-	root3 := append(coz.B64(nil), tree.RootHash()...)
+	root3 := append(coz.B64(nil), tree.Root()...)
 
 	if err := tree.Append([]byte("d")); err != nil {
 		t.Fatal(err)
@@ -177,10 +177,10 @@ func TestAppendBinaryCompatible(t *testing.T) {
 	inner1 := sha256Sum(append(append([]byte{}, c...), d...))
 	wantRoot := sha256Sum(append(append([]byte{}, inner0...), inner1...))
 
-	if !bytes.Equal(tree.RootHash(), wantRoot) {
-		t.Fatalf("RootHash() = %s, want %s", tree.RootHash(), wantRoot)
+	if !bytes.Equal(tree.Root(), wantRoot) {
+		t.Fatalf("Root() = %s, want %s", tree.Root(), wantRoot)
 	}
-	if bytes.Equal(tree.RootHash(), root3) {
+	if bytes.Equal(tree.Root(), root3) {
 		t.Fatal("root should change after append")
 	}
 }
