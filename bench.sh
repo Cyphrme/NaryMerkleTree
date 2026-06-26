@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+# Run with ./bench.sh
 {
   echo "Benchmark Run"
   echo "============================================"

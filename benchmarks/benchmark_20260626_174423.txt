@@ -1,0 +1,54 @@
+Benchmark Run
+============================================
+Date:     2026-06-26 23:44:23 UTC
+Commit:   caf88dd5fd80
+Branch:   master
+Go:       go version go1.25.5 linux/amd64
+============================================
+
+goos: linux
+goarch: amd64
+pkg: github.com/cyphrme/narymerkletree
+cpu: AMD Ryzen 7 5700X 8-Core Processor             
+BenchmarkBuildFromLeavesFlat/16-16      	   74841	     16776 ns/op	   20470 B/op	     309 allocs/op
+BenchmarkBuildFromLeavesFlat/64-16      	   18514	     66708 ns/op	   83667 B/op	    1326 allocs/op
+BenchmarkBuildFromLeavesFlat/256-16     	    4464	    284246 ns/op	  347908 B/op	    5369 allocs/op
+BenchmarkBuildFromLeavesFlat/1024-16    	    1014	   1239430 ns/op	 1426900 B/op	   21517 allocs/op
+BenchmarkBuildFromLeavesBinary/16-16    	   26176	     44121 ns/op	   41928 B/op	     740 allocs/op
+BenchmarkBuildFromLeavesBinary/64-16    	    4713	    218168 ns/op	  189650 B/op	    3154 allocs/op
+BenchmarkBuildFromLeavesBinary/256-16   	    1185	   1033572 ns/op	  838187 B/op	   13536 allocs/op
+BenchmarkBuildFromLeavesBinary/1024-16  	     219	   5560731 ns/op	 4389701 B/op	   71436 allocs/op
+BenchmarkAppend/16-16                   	   75127	     16528 ns/op	   17016 B/op	     276 allocs/op
+BenchmarkAppend/64-16                   	   21452	     53955 ns/op	   63832 B/op	    1100 allocs/op
+BenchmarkAppend/256-16                  	    5032	    233894 ns/op	  254234 B/op	    4374 allocs/op
+BenchmarkAppend/1024-16                 	    1182	   1032501 ns/op	 1050546 B/op	   17448 allocs/op
+BenchmarkRebuild/16-16                  	   88635	     13715 ns/op	   14094 B/op	     235 allocs/op
+BenchmarkRebuild/64-16                  	   23544	     50103 ns/op	   57834 B/op	    1012 allocs/op
+BenchmarkRebuild/256-16                 	    5041	    222792 ns/op	  245153 B/op	    4095 allocs/op
+BenchmarkRebuild/1024-16                	    1204	    964046 ns/op	 1014590 B/op	   16401 allocs/op
+BenchmarkGenerateInclusionProof/16-16   	  143998	      8354 ns/op	    7880 B/op	     142 allocs/op
+BenchmarkGenerateInclusionProof/64-16   	   36948	     32640 ns/op	   30672 B/op	     579 allocs/op
+BenchmarkGenerateInclusionProof/256-16  	    8558	    139828 ns/op	  120648 B/op	    2311 allocs/op
+BenchmarkGenerateInclusionProof/1024-16 	    1855	    620144 ns/op	  501649 B/op	    9232 allocs/op
+BenchmarkVerifyInclusion/16-16          	  702210	      1576 ns/op	    3456 B/op	      41 allocs/op
+BenchmarkVerifyInclusion/64-16          	  209710	      5665 ns/op	   14976 B/op	     140 allocs/op
+BenchmarkVerifyInclusion/256-16         	   52270	     23244 ns/op	   71936 B/op	     529 allocs/op
+BenchmarkVerifyInclusion/1024-16        	   12852	     92602 ns/op	  305920 B/op	    2070 allocs/op
+BenchmarkGenerateConsistencyProof/16-16 	  511945	      2207 ns/op	    2452 B/op	      51 allocs/op
+BenchmarkGenerateConsistencyProof/64-16 	  116863	      9677 ns/op	   10568 B/op	     221 allocs/op
+BenchmarkGenerateConsistencyProof/256-16         	   29262	     40759 ns/op	   43169 B/op	     893 allocs/op
+BenchmarkGenerateConsistencyProof/1024-16        	    5961	    174023 ns/op	  173443 B/op	    3581 allocs/op
+BenchmarkVerifyConsistency/16-16                 	 5004747	       240.2 ns/op	     304 B/op	       5 allocs/op
+BenchmarkVerifyConsistency/64-16                 	 5011213	       246.4 ns/op	     304 B/op	       5 allocs/op
+BenchmarkVerifyConsistency/256-16                	 5111996	       242.0 ns/op	     304 B/op	       5 allocs/op
+BenchmarkVerifyConsistency/1024-16               	 5224771	       240.4 ns/op	     304 B/op	       5 allocs/op
+BenchmarkMarshalJSON/16-16                       	   46206	     26132 ns/op	   11543 B/op	     161 allocs/op
+BenchmarkMarshalJSON/64-16                       	    8950	    113995 ns/op	   47124 B/op	     641 allocs/op
+BenchmarkMarshalJSON/256-16                      	    2056	    491081 ns/op	  196131 B/op	    2561 allocs/op
+BenchmarkMarshalJSON/1024-16                     	     524	   2168763 ns/op	  804371 B/op	   10245 allocs/op
+BenchmarkUnmarshalJSON/16-16                     	   13738	     86423 ns/op	   52873 B/op	     949 allocs/op
+BenchmarkUnmarshalJSON/64-16                     	    2719	    428276 ns/op	  242594 B/op	    4341 allocs/op
+BenchmarkUnmarshalJSON/256-16                    	     620	   2011319 ns/op	 1077141 B/op	   19397 allocs/op
+BenchmarkUnmarshalJSON/1024-16                   	     110	  10830089 ns/op	 5763257 B/op	  101624 allocs/op
+PASS
+ok  	github.com/cyphrme/narymerkletree	66.126s
