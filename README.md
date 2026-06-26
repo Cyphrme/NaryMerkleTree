@@ -37,7 +37,9 @@ proofs use a binary-composed MTH over leaf order (RFC 6962 §2.1.3) and require
 flat append layout (`Arity <= 1`).
 
 ## Nomenclature
-**N-ary** - This library is n-ary meaning dynamic arity.  Also support k-ary (static arity).
+**N-ary** - This library is n-ary, meaning "dynamic arity at the node".  The
+library supports **k-ary** (static arity, ever node in a tree has the same
+arity).
 
 **Singleton Promotion** - If a node has only one child, the parent assumes the
 child's value without addition hashing. (May be turned off)
@@ -77,9 +79,13 @@ leaf and its content is considered a subtree.)
 balanced and have a unary case.  This is unlike a binary tree which cannot be
 balanced if there is a unary case.  Whereas "balanced" and "symmetrical" and
 "not-have-a-unary-case" can be ambiguated for binary Merkle trees, it must be
-disambiguated for n-ary Merkle trees. Even though a balanced tree is symmetrical and a
-symmetrical tree is balanced, balances carries more of the connotation that a subtree or branch may be balanced while the whole tree may not be symmetrical. A balanced/symmetrical tree may have unary cases.
+disambiguated for n-ary Merkle trees. Even though a balanced tree is symmetrical
+and a symmetrical tree is balanced, balances carries more of the connotation
+that a subtree or branch may be balanced while the whole tree may not be
+symmetrical. A balanced/symmetrical tree may have unary cases.
 
+## Benchmark
+See bench.sh
 
 ### Notes
 This library has no support for "prefixes", which we consider to be an
