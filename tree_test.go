@@ -71,25 +71,25 @@ func TestSHA256KnownVectors(t *testing.T) {
 	}
 }
 
-func TestAddSortPaths(t *testing.T) {
+func TestInsertPaths(t *testing.T) {
 	tree, err := New(crypto.SHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tree.Add([]int{}, sha256Sum([]byte("a"))); err != nil {
+	if err := tree.Insert([]int{}, sha256Sum([]byte("a"))); err != nil {
 		t.Fatal(err)
 	}
-	if err := tree.Add([]int{1}, sha256Sum([]byte("c"))); err != nil {
+	if err := tree.Insert([]int{1}, sha256Sum([]byte("c"))); err != nil {
 		t.Fatal(err)
 	}
-	if err := tree.Add([]int{0}, sha256Sum([]byte("b"))); err != nil {
+	if err := tree.Insert([]int{0}, sha256Sum([]byte("b"))); err != nil {
 		t.Fatal(err)
 	}
-	if err := tree.Add([]int{0, 1}, sha256Sum([]byte("d"))); err != nil {
+	if err := tree.Insert([]int{0, 1}, sha256Sum([]byte("d"))); err != nil {
 		t.Fatal(err)
 	}
-	if err := tree.Add([]int{0, 0}, sha256Sum([]byte("e"))); err != nil {
+	if err := tree.Insert([]int{0, 0}, sha256Sum([]byte("e"))); err != nil {
 		t.Fatal(err)
 	}
 
@@ -111,16 +111,16 @@ func TestAddSortPaths(t *testing.T) {
 	}
 }
 
-func TestAddDuplicatePath(t *testing.T) {
+func TestInsertDuplicatePath(t *testing.T) {
 	tree, err := New(crypto.SHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := tree.Add([]int{0}, sha256Sum([]byte("a"))); err != nil {
+	if err := tree.Insert([]int{0}, sha256Sum([]byte("a"))); err != nil {
 		t.Fatal(err)
 	}
-	if err := tree.Add([]int{0}, sha256Sum([]byte("b"))); err != ErrDuplicatePath {
-		t.Fatalf("Add() = %v, want ErrDuplicatePath", err)
+	if err := tree.Insert([]int{0}, sha256Sum([]byte("b"))); err != ErrDuplicatePath {
+		t.Fatalf("Insert() = %v, want ErrDuplicatePath", err)
 	}
 }
 
@@ -130,13 +130,13 @@ func TestMarshalJSONDeterministicSHA256(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := tree.Add([]int{1}, sha256Sum([]byte("leaf-1"))); err != nil {
+	if err := tree.Insert([]int{1}, sha256Sum([]byte("leaf-1"))); err != nil {
 		t.Fatal(err)
 	}
-	if err := tree.Add([]int{0}, sha256Sum([]byte("leaf-0"))); err != nil {
+	if err := tree.Insert([]int{0}, sha256Sum([]byte("leaf-0"))); err != nil {
 		t.Fatal(err)
 	}
-	if err := tree.Add([]int{0, 1}, sha256Sum([]byte("leaf-0-1"))); err != nil {
+	if err := tree.Insert([]int{0, 1}, sha256Sum([]byte("leaf-0-1"))); err != nil {
 		t.Fatal(err)
 	}
 

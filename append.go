@@ -152,13 +152,7 @@ func (t *Tree) Append(data ...[]byte) error {
 			return err
 		}
 
-		t.ensureNodes()
-		p := append(Path(nil), path...)
-		t.Nodes[pathKey(p)] = Node{
-			Path:   p,
-			Digest: digest,
-		}
-		if err := t.Rebuild(); err != nil {
+		if err := t.insertAt(path, digest); err != nil {
 			return err
 		}
 	}

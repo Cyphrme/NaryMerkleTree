@@ -200,21 +200,20 @@ func TestAppendBinaryRestructure(t *testing.T) {
 	}
 }
 
-func TestAppendOnlyAdd(t *testing.T) {
+func TestAppendOnlyInsert(t *testing.T) {
 	tree, err := New(crypto.SHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
 	tree.AppendOnly = true
 
-	d := sha256Sum([]byte("first"))
-	if err := tree.Add([]int{0}, d); err != nil {
+	if err := tree.Insert([]int{0}, sha256Sum([]byte("skip"))); err != ErrAppendOnly {
+		t.Fatalf("Insert() = %v, want ErrAppendOnly", err)
+	}
+	if err := tree.Append([]byte("first")); err != nil {
 		t.Fatal(err)
 	}
-	if err := tree.Add([]int{2}, sha256Sum([]byte("skip"))); err != ErrAppendOnly {
-		t.Fatalf("Add() = %v, want ErrAppendOnly", err)
-	}
-	if err := tree.Add([]int{1}, sha256Sum([]byte("second"))); err != nil {
+	if err := tree.Append([]byte("second")); err != nil {
 		t.Fatal(err)
 	}
 	if tree.Size() != 2 {

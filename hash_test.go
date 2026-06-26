@@ -8,9 +8,9 @@ import (
 	"github.com/cyphrme/coz"
 )
 
-func mustAdd(t *testing.T, tree *Tree, path []int, digest coz.B64) {
+func mustInsert(t *testing.T, tree *Tree, path []int, digest coz.B64) {
 	t.Helper()
-	if err := tree.Add(path, digest); err != nil {
+	if err := tree.Insert(path, digest); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -37,7 +37,7 @@ func TestPromotion(t *testing.T) {
 	}
 
 	leaf := sha256Sum([]byte("leaf"))
-	mustAdd(t, tree, []int{0}, leaf)
+	mustInsert(t, tree, []int{0}, leaf)
 
 	got := tree.Root()
 	if !bytes.Equal(got, leaf) {
@@ -64,8 +64,8 @@ func TestCollapse(t *testing.T) {
 	}
 
 	d := sha256Sum([]byte("same"))
-	mustAdd(t, tree, []int{0}, d)
-	mustAdd(t, tree, []int{1}, d)
+	mustInsert(t, tree, []int{0}, d)
+	mustInsert(t, tree, []int{1}, d)
 
 	got := tree.Root()
 	if !bytes.Equal(got, d) {
@@ -90,8 +90,8 @@ func TestConcatOrder(t *testing.T) {
 
 	a := sha256Sum([]byte("a"))
 	b := sha256Sum([]byte("b"))
-	mustAdd(t, tree, []int{0}, a)
-	mustAdd(t, tree, []int{1}, b)
+	mustInsert(t, tree, []int{0}, a)
+	mustInsert(t, tree, []int{1}, b)
 
 	var buf []byte
 	buf = append(buf, a...)
@@ -122,9 +122,9 @@ func TestArbitraryTree(t *testing.T) {
 	d00 := sha256Sum([]byte("00"))
 	d01 := sha256Sum([]byte("01"))
 	d1 := sha256Sum([]byte("1"))
-	mustAdd(t, tree, []int{0, 0}, d00)
-	mustAdd(t, tree, []int{0, 1}, d01)
-	mustAdd(t, tree, []int{1}, d1)
+	mustInsert(t, tree, []int{0, 0}, d00)
+	mustInsert(t, tree, []int{0, 1}, d01)
+	mustInsert(t, tree, []int{1}, d1)
 
 	inner0 := sha256Sum(append(append([]byte{}, d00...), d01...))
 	wantRoot := sha256Sum(append(append([]byte{}, inner0...), d1...))
@@ -157,8 +157,8 @@ func TestNullChildrenParentNull(t *testing.T) {
 	}
 
 	// Only explicit null leaves; parent should be null.
-	mustAdd(t, tree, []int{0}, nil)
-	mustAdd(t, tree, []int{1}, nil)
+	mustInsert(t, tree, []int{0}, nil)
+	mustInsert(t, tree, []int{1}, nil)
 
 	if tree.Root() != nil {
 		t.Fatalf("Root() = %s, want nil for all-null children", tree.Root())
@@ -170,8 +170,8 @@ func TestRebuildIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustAdd(t, tree, []int{0}, sha256Sum([]byte("a")))
-	mustAdd(t, tree, []int{1}, sha256Sum([]byte("b")))
+	mustInsert(t, tree, []int{0}, sha256Sum([]byte("a")))
+	mustInsert(t, tree, []int{1}, sha256Sum([]byte("b")))
 
 	first := append(coz.B64(nil), tree.Root()...)
 	if err := tree.Rebuild(); err != nil {
@@ -198,7 +198,7 @@ func TestPromoteDisabled(t *testing.T) {
 	}
 
 	leaf := sha256Sum([]byte("only"))
-	mustAdd(t, tree, []int{0}, leaf)
+	mustInsert(t, tree, []int{0}, leaf)
 
 	want := sha256Sum(append([]byte{}, leaf...))
 	got := tree.Root()

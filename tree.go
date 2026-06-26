@@ -76,7 +76,7 @@ type Tree struct {
 	// BuildFromLeaves and Append. Internal fanout at each node is determined by
 	// child paths during Rebuild(), not by Arity.
 	Arity int `json:"arity,omitempty"`
-	// AppendOnly restricts Add to the next append-order leaf path.
+	// AppendOnly forbids Insert; new leaves must be added via Append.
 	AppendOnly bool `json:"append_only,omitempty"`
 
 	// Derived values; Nodes remains the source of truth.
@@ -164,19 +164,18 @@ func (t *Tree) ensureNodes() {
 	}
 }
 
-// Add inserts a node at path. Returns ErrDuplicatePath if the path exists.
-func (t *Tree) Add(path []int, digest coz.B64) error {
+// Insert adds a node at an arbitrary path. Returns ErrDuplicatePath if the path
+// exists. Returns ErrAppendOnly when the tree is append-only (use Append).
+func (t *Tree) Insert(path []int, digest coz.B64) error {
 	if t.AppendOnly {
-		next, err := t.nextLeafPath()
-		if err != nil {
-			return err
-		}
-		if !pathsEqual(Path(path), next) {
-			return ErrAppendOnly
-		}
+		return ErrAppendOnly
 	}
+	return t.insertAt(Path(path), digest)
+}
+
+func (t *Tree) insertAt(path Path, digest coz.B64) error {
 	t.ensureNodes()
-	key := pathKey(Path(path))
+	key := pathKey(path)
 	if _, ok := t.Nodes[key]; ok {
 		return ErrDuplicatePath
 	}
@@ -215,7 +214,7 @@ var (
 	ErrIndexOutOfRange   = &Error{"index out of range"}
 	ErrInvalidProof      = &Error{"invalid proof"}
 	ErrDuplicatePath     = &Error{"duplicate path"}
-	ErrAppendOnly        = &Error{"append only: path must be next leaf position"}
+	ErrAppendOnly        = &Error{"append only: use Append, not Insert"}
 	ErrAppendRestructure = &Error{"append would restructure k-ary leaf paths"}
 )
 

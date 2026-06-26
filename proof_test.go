@@ -99,9 +99,9 @@ func TestInclusionProofArbitraryTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustAdd(t, tree, []int{0, 0}, sha256Sum([]byte("00")))
-	mustAdd(t, tree, []int{0, 1}, sha256Sum([]byte("01")))
-	mustAdd(t, tree, []int{1}, sha256Sum([]byte("1")))
+	mustInsert(t, tree, []int{0, 0}, sha256Sum([]byte("00")))
+	mustInsert(t, tree, []int{0, 1}, sha256Sum([]byte("01")))
+	mustInsert(t, tree, []int{1}, sha256Sum([]byte("1")))
 
 	proof, err := tree.GenerateInclusionProof(1)
 	if err != nil {
