@@ -174,10 +174,10 @@ func TestMarshalJSONDeterministicSHA256(t *testing.T) {
 	nullD := sha256Sum(nil)
 	inner0 := sha256Sum(append(append([]byte{}, nullD...), leaf01...))
 	wantDigests := map[string]coz.B64{
-		"[]":    nil, // computed root
-		"[0]":   inner0,
-		"[1]":   leaf1,
-		"[0,1]": leaf01,
+		pathKey(Path{}):      nil, // computed root
+		pathKey(Path{0}):     inner0,
+		pathKey(Path{1}):     leaf1,
+		pathKey(Path{0, 1}):  leaf01,
 	}
 	for _, node := range sortedNodes(decoded.Nodes) {
 		key := pathKey(node.Path)
@@ -185,7 +185,7 @@ func TestMarshalJSONDeterministicSHA256(t *testing.T) {
 		if !ok {
 			t.Fatalf("unexpected path %v in decoded JSON", node.Path)
 		}
-		if key == "[]" {
+		if key == pathKey(Path{}) {
 			if node.Digest == nil {
 				t.Fatalf("root digest should be computed after unmarshal rebuild")
 			}

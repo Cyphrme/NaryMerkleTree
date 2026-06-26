@@ -31,9 +31,9 @@ type ConsistencyProof struct {
 
 // proofStepAt builds one inclusion-proof step at parent for child position pos.
 func (t *Tree) proofStepAt(parent Path, pos int) (ProofStep, error) {
-	paths := collectPaths(t.Nodes)
-	nodeMap := linkedNodeMap(t.Nodes, paths)
-	children := gatherChildren(parent, nodeMap, paths)
+	layout := buildPathLayout(t.Nodes)
+	nodeMap := linkedNodeMap(t.Nodes, layout.paths)
+	children := gatherChildren(parent, nodeMap, layout.maxChild)
 	if children == nil {
 		return ProofStep{}, ErrInvalidProof
 	}

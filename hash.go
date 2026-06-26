@@ -2,22 +2,72 @@ package narymerkletree
 
 import (
 	"bytes"
-	"encoding/json"
 	"sort"
+	"strconv"
 
 	"github.com/cyphrme/coz"
 )
 
-// pathKey returns a canonical string key for a path.
+// pathKey returns a canonical in-memory map key for a path.
 func pathKey(path Path) string {
 	if len(path) == 0 {
-		path = Path{}
+		return ""
 	}
-	b, err := json.Marshal(path)
-	if err != nil {
-		panic(err)
+	b := make([]byte, 0, len(path)*4)
+	for i, v := range path {
+		if i > 0 {
+			b = append(b, '.')
+		}
+		b = strconv.AppendInt(b, int64(v), 10)
 	}
 	return string(b)
+}
+
+// pathLayout indexes paths for rebuild and proof walks.
+type pathLayout struct {
+	paths    []Path
+	internal map[string]struct{}
+	maxChild map[string]int
+}
+
+// buildPathLayout gathers explicit and implicit ancestor paths from nodes.
+func buildPathLayout(nodes map[string]Node) pathLayout {
+	seen := make(map[string]Path)
+	internal := make(map[string]struct{})
+	maxChild := make(map[string]int)
+
+	for _, n := range nodes {
+		path := n.Path
+		for i := 0; i <= len(path); i++ {
+			p := path[:i]
+			key := pathKey(p)
+			if _, ok := seen[key]; !ok {
+				seen[key] = append(Path(nil), p...)
+			}
+			if i > 0 {
+				parentKey := pathKey(path[:i-1])
+				internal[parentKey] = struct{}{}
+				idx := path[i-1]
+				if v, ok := maxChild[parentKey]; !ok || idx > v {
+					maxChild[parentKey] = idx
+				}
+			}
+		}
+	}
+
+	paths := make([]Path, 0, len(seen))
+	for _, p := range seen {
+		paths = append(paths, p)
+	}
+	sort.Slice(paths, func(i, j int) bool {
+		return comparePaths(paths[i], paths[j]) < 0
+	})
+
+	return pathLayout{
+		paths:    paths,
+		internal: internal,
+		maxChild: maxChild,
+	}
 }
 
 // hash computes a digest for raw bytes using the tree's hash algorithm.
@@ -31,7 +81,15 @@ func (t *Tree) hash(data []byte) (coz.B64, error) {
 
 // nullDigest returns hash(empty), the digest contributed by null children.
 func (t *Tree) nullDigest() (coz.B64, error) {
-	return t.hash(nil)
+	if t.nullDigestCache != nil {
+		return t.nullDigestCache, nil
+	}
+	d, err := t.hash(nil)
+	if err != nil {
+		return nil, err
+	}
+	t.nullDigestCache = d
+	return d, nil
 }
 
 // effectiveDigest returns the digest used when combining children into a parent.
@@ -107,49 +165,9 @@ func isPrefix(prefix, path Path) bool {
 	return true
 }
 
-// isInternal reports whether path has at least one child among paths.
-func isInternal(path Path, paths []Path) bool {
-	for _, p := range paths {
-		if len(p) == len(path)+1 && isPrefix(path, p) {
-			return true
-		}
-	}
-	return false
-}
-
-// directChildIndex returns the child index of child under parent, or -1.
-func directChildIndex(parent, child Path) int {
-	if len(child) != len(parent)+1 || !isPrefix(parent, child) {
-		return -1
-	}
-	return child[len(parent)]
-}
-
-// prefixPaths returns path and every ancestor path down to the root.
-func prefixPaths(path Path) []Path {
-	prefixes := make([]Path, len(path)+1)
-	for i := 0; i <= len(path); i++ {
-		prefixes[i] = append(Path(nil), path[:i]...)
-	}
-	return prefixes
-}
-
 // collectPaths gathers every explicit and implicit ancestor path from nodes.
 func collectPaths(nodes map[string]Node) []Path {
-	seen := make(map[string]Path)
-	for _, n := range nodes {
-		for _, p := range prefixPaths(n.Path) {
-			seen[pathKey(p)] = p
-		}
-	}
-	paths := make([]Path, 0, len(seen))
-	for _, p := range seen {
-		paths = append(paths, p)
-	}
-	sort.Slice(paths, func(i, j int) bool {
-		return comparePaths(paths[i], paths[j]) < 0
-	})
-	return paths
+	return buildPathLayout(nodes).paths
 }
 
 // pathsByDepthDesc returns paths sorted deepest-first, then lexicographically.
@@ -166,14 +184,9 @@ func pathsByDepthDesc(paths []Path) []Path {
 }
 
 // gatherChildren returns direct children of parent, left-filled with null nodes.
-func gatherChildren(parent Path, nodeMap map[string]*Node, paths []Path) []*Node {
-	maxIdx := -1
-	for _, p := range paths {
-		if idx := directChildIndex(parent, p); idx >= 0 && idx > maxIdx {
-			maxIdx = idx
-		}
-	}
-	if maxIdx < 0 {
+func gatherChildren(parent Path, nodeMap map[string]*Node, maxChild map[string]int) []*Node {
+	maxIdx, ok := maxChild[pathKey(parent)]
+	if !ok {
 		return nil
 	}
 
@@ -205,10 +218,11 @@ func (t *Tree) digestAt(path Path) coz.B64 {
 func linkedNodeMap(nodes map[string]Node, paths []Path) map[string]*Node {
 	nodeMap := make(map[string]*Node, len(paths))
 	for key, n := range nodes {
-		nodeMap[key] = &Node{
-			Digest: append(coz.B64(nil), n.Digest...),
-			Path:   append(Path(nil), n.Path...),
+		node := &Node{Path: append(Path(nil), n.Path...)}
+		if n.Digest != nil {
+			node.Digest = append(coz.B64(nil), n.Digest...)
 		}
+		nodeMap[key] = node
 	}
 	for _, p := range paths {
 		key := pathKey(p)
@@ -219,49 +233,31 @@ func linkedNodeMap(nodes map[string]Node, paths []Path) map[string]*Node {
 	return nodeMap
 }
 
-// Rebuild computes internal digests bottom-up from flat Nodes and refreshes
-// derived leaf metadata. The root lives at path [] in Nodes.
-func (t *Tree) Rebuild() error {
-	if len(t.Nodes) == 0 {
-		t.leafPaths = nil
-		t.leafDigests = nil
-		return nil
-	}
-
-	paths := collectPaths(t.Nodes)
-	nodeMap := linkedNodeMap(t.Nodes, paths)
-
-	for _, p := range pathsByDepthDesc(paths) {
-		if !isInternal(p, paths) {
-			continue
+func isFlatLayout(nodes map[string]Node) bool {
+	for _, n := range nodes {
+		if len(n.Path) > 1 {
+			return false
 		}
+	}
+	return true
+}
+
+func (t *Tree) syncNodesFrom(nodeMap map[string]*Node, layout pathLayout) {
+	t.Nodes = make(map[string]Node, len(layout.paths))
+	for _, p := range layout.paths {
 		key := pathKey(p)
 		n := nodeMap[key]
-		children := gatherChildren(p, nodeMap, paths)
-		n.Children = children
-
-		digest, err := t.digestChildren(children)
-		if err != nil {
-			return err
-		}
-		n.Digest = digest
-	}
-
-	// Sync Nodes map from nodeMap (includes implicit ancestors).
-	t.Nodes = make(map[string]Node, len(paths))
-	for _, p := range paths {
-		n := nodeMap[pathKey(p)]
-		key := pathKey(p)
 		t.Nodes[key] = Node{
 			Digest: append(coz.B64(nil), n.Digest...),
 			Path:   append(Path(nil), n.Path...),
 		}
 	}
+}
 
-	// Leaves: paths that are not prefixes of any deeper path.
+func (t *Tree) syncLeavesFrom(nodeMap map[string]*Node, layout pathLayout) {
 	var leafPaths []Path
-	for _, p := range paths {
-		if isInternal(p, paths) {
+	for _, p := range layout.paths {
+		if _, ok := layout.internal[pathKey(p)]; ok {
 			continue
 		}
 		leafPaths = append(leafPaths, append(Path(nil), p...))
@@ -275,6 +271,67 @@ func (t *Tree) Rebuild() error {
 			t.leafDigests[i] = &digest
 		}
 	}
+}
 
+// rebuildFlat handles the common append-only case where all leaves are direct
+// root children (Arity <= 1 and no deeper paths).
+func (t *Tree) rebuildFlat() error {
+	layout := buildPathLayout(t.Nodes)
+	nodeMap := linkedNodeMap(t.Nodes, layout.paths)
+
+	rootKey := pathKey(Path{})
+	root, ok := nodeMap[rootKey]
+	if !ok {
+		root = &Node{Path: Path{}}
+		nodeMap[rootKey] = root
+	}
+
+	children := gatherChildren(Path{}, nodeMap, layout.maxChild)
+	root.Children = children
+	digest, err := t.digestChildren(children)
+	if err != nil {
+		return err
+	}
+	root.Digest = digest
+
+	t.syncNodesFrom(nodeMap, layout)
+	t.syncLeavesFrom(nodeMap, layout)
+	return nil
+}
+
+// Rebuild computes internal digests bottom-up from flat Nodes and refreshes
+// derived leaf metadata. The root lives at path [] in Nodes.
+func (t *Tree) Rebuild() error {
+	if len(t.Nodes) == 0 {
+		t.leafPaths = nil
+		t.leafDigests = nil
+		return nil
+	}
+
+	if t.Arity <= 1 && isFlatLayout(t.Nodes) {
+		return t.rebuildFlat()
+	}
+
+	layout := buildPathLayout(t.Nodes)
+	nodeMap := linkedNodeMap(t.Nodes, layout.paths)
+
+	for _, p := range pathsByDepthDesc(layout.paths) {
+		key := pathKey(p)
+		if _, ok := layout.internal[key]; !ok {
+			continue
+		}
+		n := nodeMap[key]
+		children := gatherChildren(p, nodeMap, layout.maxChild)
+		n.Children = children
+
+		digest, err := t.digestChildren(children)
+		if err != nil {
+			return err
+		}
+		n.Digest = digest
+	}
+
+	t.syncNodesFrom(nodeMap, layout)
+	t.syncLeavesFrom(nodeMap, layout)
 	return nil
 }

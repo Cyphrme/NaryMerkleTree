@@ -84,6 +84,8 @@ type Tree struct {
 	// Derived values; Nodes remains the source of truth.
 	leafPaths   []Path     // Left-to-right leaf paths. Empty if uncalculated.
 	leafDigests []*coz.B64 // Hashed leaves aligned with leafPaths.
+
+	nullDigestCache coz.B64 `json:"-"`
 }
 
 // New returns a new empty n-ary Merkle Tree.
