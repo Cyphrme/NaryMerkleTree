@@ -128,7 +128,7 @@ func prefixPaths(path Path) []Path {
 	return prefixes
 }
 
-func collectPaths(nodes []Node) []Path {
+func collectPaths(nodes map[string]Node) []Path {
 	seen := make(map[string]Path)
 	for _, n := range nodes {
 		for _, p := range prefixPaths(n.Path) {
@@ -182,13 +182,30 @@ func gatherChildren(parent Path, nodeMap map[string]*Node, paths []Path) []*Node
 }
 
 func (t *Tree) digestAt(path Path) coz.B64 {
-	key := pathKey(path)
-	for _, n := range t.Nodes {
-		if pathKey(n.Path) == key {
-			return n.Digest
-		}
+	if t.Nodes == nil {
+		return nil
+	}
+	if n, ok := t.Nodes[pathKey(path)]; ok {
+		return n.Digest
 	}
 	return nil
+}
+
+func linkedNodeMap(nodes map[string]Node, paths []Path) map[string]*Node {
+	nodeMap := make(map[string]*Node, len(paths))
+	for key, n := range nodes {
+		nodeMap[key] = &Node{
+			Digest: append(coz.B64(nil), n.Digest...),
+			Path:   append(Path(nil), n.Path...),
+		}
+	}
+	for _, p := range paths {
+		key := pathKey(p)
+		if _, ok := nodeMap[key]; !ok {
+			nodeMap[key] = &Node{Path: append(Path(nil), p...)}
+		}
+	}
+	return nodeMap
 }
 
 // Rebuild computes internal digests bottom-up from flat Nodes and refreshes
@@ -201,22 +218,7 @@ func (t *Tree) Rebuild() error {
 	}
 
 	paths := collectPaths(t.Nodes)
-
-	// Last occurrence wins for duplicate paths.
-	nodeMap := make(map[string]*Node, len(paths))
-	for _, n := range t.Nodes {
-		key := pathKey(n.Path)
-		nodeMap[key] = &Node{
-			Digest: append(coz.B64(nil), n.Digest...),
-			Path:   append(Path(nil), n.Path...),
-		}
-	}
-	for _, p := range paths {
-		key := pathKey(p)
-		if _, ok := nodeMap[key]; !ok {
-			nodeMap[key] = &Node{Path: append(Path(nil), p...)}
-		}
-	}
+	nodeMap := linkedNodeMap(t.Nodes, paths)
 
 	for _, p := range pathsByDepthDesc(paths) {
 		if !isInternal(p, paths) {
@@ -234,16 +236,16 @@ func (t *Tree) Rebuild() error {
 		n.Digest = digest
 	}
 
-	// Sync flat Nodes from nodeMap (includes implicit ancestors).
-	t.Nodes = make([]Node, 0, len(nodeMap))
+	// Sync Nodes map from nodeMap (includes implicit ancestors).
+	t.Nodes = make(map[string]Node, len(paths))
 	for _, p := range paths {
 		n := nodeMap[pathKey(p)]
-		t.Nodes = append(t.Nodes, Node{
+		key := pathKey(p)
+		t.Nodes[key] = Node{
 			Digest: append(coz.B64(nil), n.Digest...),
 			Path:   append(Path(nil), n.Path...),
-		})
+		}
 	}
-	t.Sort()
 
 	// Leaves: paths that are not prefixes of any deeper path.
 	var leafPaths []Path

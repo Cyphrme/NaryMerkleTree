@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"crypto/sha256"
 	"encoding/json"
+	"sort"
 	"strings"
 	"testing"
 
@@ -14,6 +15,20 @@ import (
 func sha256Sum(data []byte) coz.B64 {
 	sum := sha256.Sum256(data)
 	return coz.B64(sum[:])
+}
+
+func sortedNodes(m map[string]Node) []Node {
+	if len(m) == 0 {
+		return nil
+	}
+	nodes := make([]Node, 0, len(m))
+	for _, n := range m {
+		nodes = append(nodes, n)
+	}
+	sort.Slice(nodes, func(i, j int) bool {
+		return comparePaths(nodes[i].Path, nodes[j].Path) < 0
+	})
+	return nodes
 }
 
 func TestNewSHA256(t *testing.T) {
@@ -77,7 +92,6 @@ func TestAddSortPaths(t *testing.T) {
 	if err := tree.Add([]int{0, 0}, sha256Sum([]byte("e"))); err != nil {
 		t.Fatal(err)
 	}
-	tree.Sort()
 
 	wantPaths := [][]int{
 		{},
@@ -86,13 +100,27 @@ func TestAddSortPaths(t *testing.T) {
 		{0, 1},
 		{1},
 	}
-	if len(tree.Nodes) != len(wantPaths) {
-		t.Fatalf("len(Nodes) = %d, want %d", len(tree.Nodes), len(wantPaths))
+	nodes := sortedNodes(tree.Nodes)
+	if len(nodes) != len(wantPaths) {
+		t.Fatalf("len(Nodes) = %d, want %d", len(nodes), len(wantPaths))
 	}
 	for i, want := range wantPaths {
-		if !pathsEqual(tree.Nodes[i].Path, want) {
-			t.Fatalf("Nodes[%d].Path = %v, want %v", i, tree.Nodes[i].Path, want)
+		if !pathsEqual(nodes[i].Path, want) {
+			t.Fatalf("Nodes[%d].Path = %v, want %v", i, nodes[i].Path, want)
 		}
+	}
+}
+
+func TestAddDuplicatePath(t *testing.T) {
+	tree, err := New(crypto.SHA256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tree.Add([]int{0}, sha256Sum([]byte("a"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := tree.Add([]int{0}, sha256Sum([]byte("b"))); err != ErrDuplicatePath {
+		t.Fatalf("Add() = %v, want ErrDuplicatePath", err)
 	}
 }
 
@@ -117,7 +145,6 @@ func TestMarshalJSONDeterministicSHA256(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tree.Sort()
 	second, err := tree.MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
@@ -148,11 +175,11 @@ func TestMarshalJSONDeterministicSHA256(t *testing.T) {
 	inner0 := sha256Sum(append(append([]byte{}, nullD...), leaf01...))
 	wantDigests := map[string]coz.B64{
 		"[]":    nil, // computed root
-		"[0]":   inner0, // internal: null-padded [0] + child [0,1]
+		"[0]":   inner0,
 		"[1]":   leaf1,
 		"[0,1]": leaf01,
 	}
-	for _, node := range decoded.Nodes {
+	for _, node := range sortedNodes(decoded.Nodes) {
 		key := pathKey(node.Path)
 		want, ok := wantDigests[key]
 		if !ok {

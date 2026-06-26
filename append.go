@@ -113,16 +113,18 @@ func (t *Tree) BuildFromLeaves(leaves [][]byte) error {
 		return nil
 	}
 
+	t.Nodes = make(map[string]Node, len(leaves))
 	paths := leafPaths(len(leaves), t.Arity)
 	for i, data := range leaves {
 		digest, err := t.hashLeaf(data)
 		if err != nil {
 			return err
 		}
-		t.Nodes = append(t.Nodes, Node{
-			Path:   append(Path(nil), paths[i]...),
+		p := append(Path(nil), paths[i]...)
+		t.Nodes[pathKey(p)] = Node{
+			Path:   p,
 			Digest: digest,
-		})
+		}
 	}
 	return t.Rebuild()
 }
@@ -150,10 +152,12 @@ func (t *Tree) Append(data ...[]byte) error {
 			return err
 		}
 
-		t.Nodes = append(t.Nodes, Node{
-			Path:   append(Path(nil), path...),
+		t.ensureNodes()
+		p := append(Path(nil), path...)
+		t.Nodes[pathKey(p)] = Node{
+			Path:   p,
 			Digest: digest,
-		})
+		}
 		if err := t.Rebuild(); err != nil {
 			return err
 		}

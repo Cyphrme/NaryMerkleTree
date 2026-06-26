@@ -59,7 +59,7 @@ var Null coz.B64
 // Digest == nil.
 type Node struct {
 	Digest   coz.B64 `json:"digest,omitempty"`
-	Children []*Node `json:"-"`              // Nodes are positionally ordered.
+	Children []*Node `json:"-"`              // Ephemeral; used during Rebuild and proofs.
 	Path     Path    `json:"path,omitempty"` // May be empty
 }
 
@@ -67,8 +67,9 @@ type Node struct {
 //
 // Assumes there is one hash for the whole tree.
 type Tree struct {
-	Hash  crypto.Hash `json:"hash"`
-	Nodes []Node      `json:"nodes,omitempty"` // Nodes includes root at path [].
+	Hash crypto.Hash `json:"hash"`
+	// Nodes is keyed by pathKey(path). JSON marshals as a sorted array of nodes.
+	Nodes map[string]Node `json:"-"`
 
 	// Arity controls append-only leaf placement. 0 or 1 is n-ary: leaves are
 	// direct root children [0..n-1]. Values >= 2 fix a static k-ary layout for
@@ -81,7 +82,6 @@ type Tree struct {
 	// Derived values; Nodes remains the source of truth.
 	leafPaths   []Path     // Left-to-right leaf paths. Empty if uncalculated.
 	leafDigests []*coz.B64 // Hashed leaves aligned with leafPaths.
-
 }
 
 // New returns a new empty n-ary Merkle Tree.
@@ -89,28 +89,58 @@ func New(h crypto.Hash) (*Tree, error) {
 	return &Tree{Hash: h}, nil
 }
 
-// Sort sorts the nodes in lexicographical path order.  This makes the output
-// deterministic.
-func (t *Tree) Sort() {
-	sort.Slice(t.Nodes, func(i, j int) bool {
-		return comparePaths(t.Nodes[i].Path, t.Nodes[j].Path) < 0
+type treeWire struct {
+	Hash       crypto.Hash `json:"hash"`
+	Nodes      []Node      `json:"nodes,omitempty"`
+	Arity      int         `json:"arity,omitempty"`
+	AppendOnly bool        `json:"append_only,omitempty"`
+}
+
+func (t *Tree) sortedNodeSlice() []Node {
+	if len(t.Nodes) == 0 {
+		return nil
+	}
+	nodes := make([]Node, 0, len(t.Nodes))
+	for _, n := range t.Nodes {
+		nodes = append(nodes, n)
+	}
+	sort.Slice(nodes, func(i, j int) bool {
+		return comparePaths(nodes[i].Path, nodes[j].Path) < 0
+	})
+	return nodes
+}
+
+// MarshalJSON returns a deterministic JSON representation with nodes as a
+// sorted array of {path, digest} objects.
+func (t *Tree) MarshalJSON() ([]byte, error) {
+	return json.Marshal(treeWire{
+		Hash:       t.Hash,
+		Nodes:      t.sortedNodeSlice(),
+		Arity:      t.Arity,
+		AppendOnly: t.AppendOnly,
 	})
 }
 
-// MarshalJSON returns a nicely sorted JSON representation.
-func (t *Tree) MarshalJSON() ([]byte, error) {
-	t.Sort() // ensure deterministic output
-	type alias Tree
-	return json.Marshal(alias(*t))
-}
-
-// UnmarshalJSON automatically sorts after loading.
+// UnmarshalJSON loads a tree from JSON and rebuilds derived state.
 func (t *Tree) UnmarshalJSON(data []byte) error {
-	type alias Tree
-	if err := json.Unmarshal(data, (*alias)(t)); err != nil {
+	var w treeWire
+	if err := json.Unmarshal(data, &w); err != nil {
 		return err
 	}
-	t.Sort()
+	t.Hash = w.Hash
+	t.Arity = w.Arity
+	t.AppendOnly = w.AppendOnly
+	t.Nodes = make(map[string]Node, len(w.Nodes))
+	for _, n := range w.Nodes {
+		key := pathKey(n.Path)
+		if _, ok := t.Nodes[key]; ok {
+			return ErrDuplicatePath
+		}
+		t.Nodes[key] = Node{
+			Path:   append(Path(nil), n.Path...),
+			Digest: append(coz.B64(nil), n.Digest...),
+		}
+	}
 	return t.Rebuild()
 }
 
@@ -128,7 +158,13 @@ func comparePaths(a, b []int) int {
 	return len(a) - len(b)
 }
 
-// Add adds a node with its path. Does not check for duplicates.
+func (t *Tree) ensureNodes() {
+	if t.Nodes == nil {
+		t.Nodes = make(map[string]Node)
+	}
+}
+
+// Add inserts a node at path. Returns ErrDuplicatePath if the path exists.
 func (t *Tree) Add(path []int, digest coz.B64) error {
 	if t.AppendOnly {
 		next, err := t.nextLeafPath()
@@ -139,10 +175,15 @@ func (t *Tree) Add(path []int, digest coz.B64) error {
 			return ErrAppendOnly
 		}
 	}
-	t.Nodes = append(t.Nodes, Node{
-		Path:   append([]int(nil), path...), // copy
+	t.ensureNodes()
+	key := pathKey(Path(path))
+	if _, ok := t.Nodes[key]; ok {
+		return ErrDuplicatePath
+	}
+	t.Nodes[key] = Node{
+		Path:   append(Path(nil), path...),
 		Digest: append(coz.B64(nil), digest...),
-	})
+	}
 	return t.Rebuild()
 }
 
@@ -173,6 +214,7 @@ var (
 	ErrInvalidParam      = &Error{"invalid parameter"}
 	ErrIndexOutOfRange   = &Error{"index out of range"}
 	ErrInvalidProof      = &Error{"invalid proof"}
+	ErrDuplicatePath     = &Error{"duplicate path"}
 	ErrAppendOnly        = &Error{"append only: path must be next leaf position"}
 	ErrAppendRestructure = &Error{"append would restructure k-ary leaf paths"}
 )

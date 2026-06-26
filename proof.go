@@ -31,20 +31,7 @@ type ConsistencyProof struct {
 
 func (t *Tree) proofStepAt(parent Path, pos int) (ProofStep, error) {
 	paths := collectPaths(t.Nodes)
-	nodeMap := make(map[string]*Node, len(paths))
-	for _, n := range t.Nodes {
-		nodeMap[pathKey(n.Path)] = &Node{
-			Digest: append(coz.B64(nil), n.Digest...),
-			Path:   append(Path(nil), n.Path...),
-		}
-	}
-	for _, p := range paths {
-		key := pathKey(p)
-		if _, ok := nodeMap[key]; !ok {
-			nodeMap[key] = &Node{Path: append(Path(nil), p...)}
-		}
-	}
-
+	nodeMap := linkedNodeMap(t.Nodes, paths)
 	children := gatherChildren(parent, nodeMap, paths)
 	if children == nil {
 		return ProofStep{}, ErrInvalidProof
