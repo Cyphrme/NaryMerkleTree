@@ -6,6 +6,36 @@ import (
 	"github.com/cyphrme/coz"
 )
 
+// Append adds hashed leaf payloads at the next append-order paths.
+// When Arity >= 2, paths are computed for the final leaf count and existing
+// leaves must already occupy the matching prefix of that layout.
+// All payloads are inserted before a single Rebuild.
+func (t *Tree) Append(data ...[]byte) error {
+	if len(data) == 0 {
+		return nil
+	}
+
+	startN := t.LeafCount()
+	finalN := startN + len(data)
+	for n := startN; n < finalN; n++ {
+		if !pathsCompatible(n, n+1, t.Arity) {
+			return ErrAppendRestructure
+		}
+	}
+
+	paths := leafPaths(finalN, t.Arity)
+	for i, payload := range data {
+		digest, err := t.hashLeaf(payload)
+		if err != nil {
+			return err
+		}
+		if err := t.storeNode(paths[startN+i], digest); err != nil {
+			return err
+		}
+	}
+	return t.Rebuild()
+}
+
 // leafPaths returns the left-to-right leaf paths for n leaves in a left-filled
 // k-ary tree. Arity <= 1 places all leaves as root children [0..n-1].
 func leafPaths(n, arity int) []Path {
@@ -24,6 +54,7 @@ func leafPaths(n, arity int) []Path {
 	return slots[:n]
 }
 
+// karyDepth returns the depth of a left-filled k-ary tree holding n leaves.
 func karyDepth(n, arity int) int {
 	if n <= 1 {
 		return 1
@@ -37,6 +68,7 @@ func karyDepth(n, arity int) int {
 	return d
 }
 
+// allSlotsAtDepth returns every leaf path at depth in index order.
 func allSlotsAtDepth(depth, arity int) []Path {
 	total := int(math.Pow(float64(arity), float64(depth)))
 	paths := make([]Path, total)
@@ -46,6 +78,7 @@ func allSlotsAtDepth(depth, arity int) []Path {
 	return paths
 }
 
+// indexToPath maps a left-to-right leaf index to its path at depth.
 func indexToPath(index, depth, arity int) Path {
 	path := make(Path, depth)
 	for i := 0; i < depth; i++ {
@@ -58,6 +91,7 @@ func indexToPath(index, depth, arity int) Path {
 	return path
 }
 
+// nextLeafPath returns the path for the next append-order leaf.
 func (t *Tree) nextLeafPath() (Path, error) {
 	n := len(t.leafPaths)
 	paths := leafPaths(n+1, t.Arity)
@@ -67,6 +101,7 @@ func (t *Tree) nextLeafPath() (Path, error) {
 	return paths[n], nil
 }
 
+// pathsEqual reports whether two paths are identical.
 func pathsEqual(a, b Path) bool {
 	if len(a) != len(b) {
 		return false
@@ -79,6 +114,8 @@ func pathsEqual(a, b Path) bool {
 	return true
 }
 
+// pathsCompatible reports whether k-ary leaf paths for oldN leaves are a
+// prefix of the layout for newN leaves. Always true when arity <= 1.
 func pathsCompatible(oldN, newN, arity int) bool {
 	if arity <= 1 {
 		return true
@@ -99,6 +136,7 @@ func pathsCompatible(oldN, newN, arity int) bool {
 	return true
 }
 
+// hashLeaf hashes a leaf payload with the tree's hash algorithm.
 func (t *Tree) hashLeaf(data []byte) (coz.B64, error) {
 	return t.hash(data)
 }
@@ -127,34 +165,4 @@ func (t *Tree) BuildFromLeaves(leaves [][]byte) error {
 		}
 	}
 	return t.Rebuild()
-}
-
-// Append adds hashed leaf payloads at the next append-order paths.
-// When Arity >= 2, paths are computed for the final leaf count and existing
-// leaves must already occupy the matching prefix of that layout.
-func (t *Tree) Append(data ...[]byte) error {
-	if len(data) == 0 {
-		return nil
-	}
-
-	for _, payload := range data {
-		path, err := t.nextLeafPath()
-		if err != nil {
-			return err
-		}
-
-		if !pathsCompatible(len(t.leafPaths), len(t.leafPaths)+1, t.Arity) {
-			return ErrAppendRestructure
-		}
-
-		digest, err := t.hashLeaf(payload)
-		if err != nil {
-			return err
-		}
-
-		if err := t.insertAt(path, digest); err != nil {
-			return err
-		}
-	}
-	return nil
 }

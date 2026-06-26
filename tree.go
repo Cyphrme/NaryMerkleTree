@@ -21,15 +21,17 @@ package narymerkletree
 
 import (
 	"crypto"
-	"encoding/json"
-	"sort"
 
 	"github.com/cyphrme/coz" // imported for base64
 )
 
-// Global options
+// Package-level hashing options. Both default to true.
 var (
-	Promote  = true
+	// Promote enables singleton promotion: a parent with one child inherits
+	// the child's effective digest without rehashing.
+	Promote = true
+	// Collapse enables collapse: when all children share the same effective
+	// digest, the parent inherits it without rehashing.
 	Collapse = true
 )
 
@@ -89,62 +91,71 @@ func New(h crypto.Hash) (*Tree, error) {
 	return &Tree{Hash: h}, nil
 }
 
-type treeWire struct {
-	Hash       crypto.Hash `json:"hash"`
-	Nodes      []Node      `json:"nodes,omitempty"`
-	Arity      int         `json:"arity,omitempty"`
-	AppendOnly bool        `json:"append_only,omitempty"`
+// Root returns the current root digest (path [] in Nodes).
+func (t *Tree) Root() coz.B64 {
+	return t.digestAt(Path{})
 }
 
-func (t *Tree) sortedNodeSlice() []Node {
-	if len(t.Nodes) == 0 {
-		return nil
+// LeafCount returns the number of leaves.
+func (t *Tree) LeafCount() int {
+	return len(t.leafPaths)
+}
+
+// NodeCount returns the number of nodes stored in the tree (leaves and internals).
+func (t *Tree) NodeCount() int {
+	if t.Nodes == nil {
+		return 0
 	}
-	nodes := make([]Node, 0, len(t.Nodes))
-	for _, n := range t.Nodes {
-		nodes = append(nodes, n)
+	return len(t.Nodes)
+}
+
+// GetLeaf returns the leaf at index in left-to-right path order.
+func (t *Tree) GetLeaf(index int) (*Node, error) {
+	if index < 0 || index >= len(t.leafPaths) {
+		return nil, ErrIndexOutOfRange
 	}
-	sort.Slice(nodes, func(i, j int) bool {
-		return comparePaths(nodes[i].Path, nodes[j].Path) < 0
-	})
-	return nodes
+	path := t.leafPaths[index]
+	return &Node{
+		Path:   append(Path(nil), path...),
+		Digest: append(coz.B64(nil), t.digestAt(path)...),
+	}, nil
 }
 
-// MarshalJSON returns a deterministic JSON representation with nodes as a
-// sorted array of {path, digest} objects.
-func (t *Tree) MarshalJSON() ([]byte, error) {
-	return json.Marshal(treeWire{
-		Hash:       t.Hash,
-		Nodes:      t.sortedNodeSlice(),
-		Arity:      t.Arity,
-		AppendOnly: t.AppendOnly,
-	})
+// Insert adds a node at an arbitrary path. Returns ErrDuplicatePath if the path
+// exists. Returns ErrAppendOnly when the tree is append-only (use Append).
+func (t *Tree) Insert(path []int, digest coz.B64) error {
+	if t.AppendOnly {
+		return ErrAppendOnly
+	}
+	return t.insertAt(Path(path), digest)
 }
 
-// UnmarshalJSON loads a tree from JSON and rebuilds derived state.
-func (t *Tree) UnmarshalJSON(data []byte) error {
-	var w treeWire
-	if err := json.Unmarshal(data, &w); err != nil {
+// storeNode records a node digest at path without rebuilding derived state.
+func (t *Tree) storeNode(path Path, digest coz.B64) error {
+	if t.Nodes == nil {
+		t.Nodes = make(map[string]Node)
+	}
+	key := pathKey(path)
+	if _, ok := t.Nodes[key]; ok {
+		return ErrDuplicatePath
+	}
+	t.Nodes[key] = Node{
+		Path:   append(Path(nil), path...),
+		Digest: append(coz.B64(nil), digest...),
+	}
+	return nil
+}
+
+// insertAt adds a node at path and rebuilds the tree.
+func (t *Tree) insertAt(path Path, digest coz.B64) error {
+	if err := t.storeNode(path, digest); err != nil {
 		return err
-	}
-	t.Hash = w.Hash
-	t.Arity = w.Arity
-	t.AppendOnly = w.AppendOnly
-	t.Nodes = make(map[string]Node, len(w.Nodes))
-	for _, n := range w.Nodes {
-		key := pathKey(n.Path)
-		if _, ok := t.Nodes[key]; ok {
-			return ErrDuplicatePath
-		}
-		t.Nodes[key] = Node{
-			Path:   append(Path(nil), n.Path...),
-			Digest: append(coz.B64(nil), n.Digest...),
-		}
 	}
 	return t.Rebuild()
 }
 
-// comparePaths returns negative if a < b, 0 if equal, positive if a > b
+// comparePaths lexicographically compares paths. Returns negative if a < b,
+// zero if equal, positive if a > b.
 func comparePaths(a, b []int) int {
 	minLen := len(a)
 	if len(b) < minLen {
@@ -158,56 +169,6 @@ func comparePaths(a, b []int) int {
 	return len(a) - len(b)
 }
 
-func (t *Tree) ensureNodes() {
-	if t.Nodes == nil {
-		t.Nodes = make(map[string]Node)
-	}
-}
-
-// Insert adds a node at an arbitrary path. Returns ErrDuplicatePath if the path
-// exists. Returns ErrAppendOnly when the tree is append-only (use Append).
-func (t *Tree) Insert(path []int, digest coz.B64) error {
-	if t.AppendOnly {
-		return ErrAppendOnly
-	}
-	return t.insertAt(Path(path), digest)
-}
-
-func (t *Tree) insertAt(path Path, digest coz.B64) error {
-	t.ensureNodes()
-	key := pathKey(path)
-	if _, ok := t.Nodes[key]; ok {
-		return ErrDuplicatePath
-	}
-	t.Nodes[key] = Node{
-		Path:   append(Path(nil), path...),
-		Digest: append(coz.B64(nil), digest...),
-	}
-	return t.Rebuild()
-}
-
-// Root returns the current root digest (path [] in Nodes).
-func (t *Tree) Root() coz.B64 {
-	return t.digestAt(Path{})
-}
-
-// Size returns the number of leaves.
-func (t *Tree) Size() int {
-	return len(t.leafPaths)
-}
-
-// Get returns the leaf at index (left-to-right path order).
-func (t *Tree) Get(index int) (*Node, error) {
-	if index < 0 || index >= len(t.leafPaths) {
-		return nil, ErrIndexOutOfRange
-	}
-	path := t.leafPaths[index]
-	return &Node{
-		Path:   append(Path(nil), path...),
-		Digest: append(coz.B64(nil), t.digestAt(path)...),
-	}, nil
-}
-
 // Errors
 var (
 	ErrInvalidParam      = &Error{"invalid parameter"}
@@ -218,6 +179,8 @@ var (
 	ErrAppendRestructure = &Error{"append would restructure k-ary leaf paths"}
 )
 
+// Error is a package-level sentinel error value.
 type Error struct{ msg string }
 
+// Error returns the error message.
 func (e *Error) Error() string { return e.msg }

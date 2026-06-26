@@ -42,8 +42,8 @@ func TestNewSHA256(t *testing.T) {
 	if got := tree.Root(); got != nil {
 		t.Fatalf("Root() = %s, want nil for empty tree", got)
 	}
-	if tree.Size() != 0 {
-		t.Fatalf("Size() = %d, want 0", tree.Size())
+	if tree.LeafCount() != 0 {
+		t.Fatalf("LeafCount() = %d, want 0", tree.LeafCount())
 	}
 }
 

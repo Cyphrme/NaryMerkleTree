@@ -29,6 +29,7 @@ type ConsistencyProof struct {
 	Hashes  []coz.B64 `json:"hashes"`
 }
 
+// proofStepAt builds one inclusion-proof step at parent for child position pos.
 func (t *Tree) proofStepAt(parent Path, pos int) (ProofStep, error) {
 	paths := collectPaths(t.Nodes)
 	nodeMap := linkedNodeMap(t.Nodes, paths)
@@ -53,6 +54,7 @@ func (t *Tree) proofStepAt(parent Path, pos int) (ProofStep, error) {
 	return step, nil
 }
 
+// climbStep hashes accum with sibling slots from one proof step toward the root.
 func (t *Tree) climbStep(accum coz.B64, step ProofStep) (coz.B64, error) {
 	if step.Width <= 0 || step.Position < 0 || step.Position >= step.Width {
 		return nil, ErrInvalidProof
@@ -77,7 +79,7 @@ func (t *Tree) GenerateInclusionProof(index int) (*InclusionProof, error) {
 	if len(t.Nodes) == 0 {
 		return nil, ErrInvalidParam
 	}
-	leaf, err := t.Get(index)
+	leaf, err := t.GetLeaf(index)
 	if err != nil {
 		return nil, err
 	}
@@ -149,6 +151,7 @@ func (t *Tree) mthRange(start, end int) (coz.B64, error) {
 	return t.hashPair(left, right)
 }
 
+// largestPow2LessThan returns the largest power of two strictly less than n.
 func largestPow2LessThan(n int) int {
 	if n <= 1 {
 		return 0
@@ -193,6 +196,7 @@ func (t *Tree) consistencySnapshot(oldSize, newSize int) ([]coz.B64, error) {
 	return t.consistencySnapshot(oldSize-k, newSize-k)
 }
 
+// rootFromConsistencyProof recomputes the new root from a consistency proof.
 func rootFromConsistencyProof(oldSize, newSize int, proof []coz.B64, rootA coz.B64, hash crypto.Hash) (coz.B64, error) {
 	t := &Tree{Hash: hash}
 	if oldSize >= newSize {
@@ -231,7 +235,7 @@ func rootFromConsistencyProof(oldSize, newSize int, proof []coz.B64, rootA coz.B
 // Consistency proofs use a binary-composed MTH over leaf order (RFC 6962
 // section 2.1.3) and require a flat append layout (Arity <= 1).
 func (t *Tree) GenerateConsistencyProof(oldSize int) (*ConsistencyProof, error) {
-	newSize := t.Size()
+	newSize := t.LeafCount()
 	if oldSize < 0 || oldSize > newSize {
 		return nil, ErrInvalidParam
 	}
@@ -246,6 +250,7 @@ func (t *Tree) GenerateConsistencyProof(oldSize int) (*ConsistencyProof, error) 
 	return &ConsistencyProof{OldSize: oldSize, Hashes: hashes}, nil
 }
 
+// hashPair combines two subtree digests using digestChildren rules.
 func (t *Tree) hashPair(left, right coz.B64) (coz.B64, error) {
 	if left == nil && right == nil {
 		return nil, nil

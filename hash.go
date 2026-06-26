@@ -20,6 +20,7 @@ func pathKey(path Path) string {
 	return string(b)
 }
 
+// hash computes a digest for raw bytes using the tree's hash algorithm.
 func (t *Tree) hash(data []byte) (coz.B64, error) {
 	h := t.Hash.New()
 	if _, err := h.Write(data); err != nil {
@@ -28,6 +29,7 @@ func (t *Tree) hash(data []byte) (coz.B64, error) {
 	return coz.B64(h.Sum(nil)), nil
 }
 
+// nullDigest returns hash(empty), the digest contributed by null children.
 func (t *Tree) nullDigest() (coz.B64, error) {
 	return t.hash(nil)
 }
@@ -92,6 +94,7 @@ func (t *Tree) digestChildren(children []*Node) (coz.B64, error) {
 	return t.hash(buf)
 }
 
+// isPrefix reports whether prefix is a prefix of path.
 func isPrefix(prefix, path Path) bool {
 	if len(prefix) > len(path) {
 		return false
@@ -104,6 +107,7 @@ func isPrefix(prefix, path Path) bool {
 	return true
 }
 
+// isInternal reports whether path has at least one child among paths.
 func isInternal(path Path, paths []Path) bool {
 	for _, p := range paths {
 		if len(p) == len(path)+1 && isPrefix(path, p) {
@@ -113,6 +117,7 @@ func isInternal(path Path, paths []Path) bool {
 	return false
 }
 
+// directChildIndex returns the child index of child under parent, or -1.
 func directChildIndex(parent, child Path) int {
 	if len(child) != len(parent)+1 || !isPrefix(parent, child) {
 		return -1
@@ -120,6 +125,7 @@ func directChildIndex(parent, child Path) int {
 	return child[len(parent)]
 }
 
+// prefixPaths returns path and every ancestor path down to the root.
 func prefixPaths(path Path) []Path {
 	prefixes := make([]Path, len(path)+1)
 	for i := 0; i <= len(path); i++ {
@@ -128,6 +134,7 @@ func prefixPaths(path Path) []Path {
 	return prefixes
 }
 
+// collectPaths gathers every explicit and implicit ancestor path from nodes.
 func collectPaths(nodes map[string]Node) []Path {
 	seen := make(map[string]Path)
 	for _, n := range nodes {
@@ -145,6 +152,7 @@ func collectPaths(nodes map[string]Node) []Path {
 	return paths
 }
 
+// pathsByDepthDesc returns paths sorted deepest-first, then lexicographically.
 func pathsByDepthDesc(paths []Path) []Path {
 	sorted := make([]Path, len(paths))
 	copy(sorted, paths)
@@ -157,6 +165,7 @@ func pathsByDepthDesc(paths []Path) []Path {
 	return sorted
 }
 
+// gatherChildren returns direct children of parent, left-filled with null nodes.
 func gatherChildren(parent Path, nodeMap map[string]*Node, paths []Path) []*Node {
 	maxIdx := -1
 	for _, p := range paths {
@@ -181,6 +190,7 @@ func gatherChildren(parent Path, nodeMap map[string]*Node, paths []Path) []*Node
 	return children
 }
 
+// digestAt returns the stored digest at path, or nil if absent.
 func (t *Tree) digestAt(path Path) coz.B64 {
 	if t.Nodes == nil {
 		return nil
@@ -191,6 +201,7 @@ func (t *Tree) digestAt(path Path) coz.B64 {
 	return nil
 }
 
+// linkedNodeMap builds a mutable node map including implicit ancestor nodes.
 func linkedNodeMap(nodes map[string]Node, paths []Path) map[string]*Node {
 	nodeMap := make(map[string]*Node, len(paths))
 	for key, n := range nodes {

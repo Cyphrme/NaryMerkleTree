@@ -43,8 +43,8 @@ func TestPromotion(t *testing.T) {
 	if !bytes.Equal(got, leaf) {
 		t.Fatalf("Root() = %s, want promoted leaf %s", got, leaf)
 	}
-	if tree.Size() != 1 {
-		t.Fatalf("Size() = %d, want 1", tree.Size())
+	if tree.LeafCount() != 1 {
+		t.Fatalf("LeafCount() = %d, want 1", tree.LeafCount())
 	}
 }
 
@@ -133,16 +133,16 @@ func TestArbitraryTree(t *testing.T) {
 	if !bytes.Equal(got, wantRoot) {
 		t.Fatalf("Root() = %s, want %s", got, wantRoot)
 	}
-	if tree.Size() != 3 {
-		t.Fatalf("Size() = %d, want 3", tree.Size())
+	if tree.LeafCount() != 3 {
+		t.Fatalf("LeafCount() = %d, want 3", tree.LeafCount())
 	}
 
-	leaf, err := tree.Get(1)
+	leaf, err := tree.GetLeaf(1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !pathsEqual(leaf.Path, []int{0, 1}) {
-		t.Fatalf("Get(1).Path = %v, want [0 1]", leaf.Path)
+		t.Fatalf("GetLeaf(1).Path = %v, want [0 1]", leaf.Path)
 	}
 }
 

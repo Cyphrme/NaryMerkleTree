@@ -42,8 +42,8 @@ func TestBuildFromLeavesFlat(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if tree.Size() != 3 {
-		t.Fatalf("Size() = %d, want 3", tree.Size())
+	if tree.LeafCount() != 3 {
+		t.Fatalf("LeafCount() = %d, want 3", tree.LeafCount())
 	}
 
 	a := sha256Sum([]byte("a"))
@@ -62,12 +62,12 @@ func TestBuildFromLeavesFlat(t *testing.T) {
 		t.Fatalf("Root() = %s, want %s", tree.Root(), wantRoot)
 	}
 
-	leaf, err := tree.Get(2)
+	leaf, err := tree.GetLeaf(2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !pathsEqual(leaf.Path, Path{2}) {
-		t.Fatalf("Get(2).Path = %v, want [2]", leaf.Path)
+		t.Fatalf("GetLeaf(2).Path = %v, want [2]", leaf.Path)
 	}
 }
 
@@ -92,8 +92,8 @@ func TestBuildFromLeavesBinary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if tree.Size() != 3 {
-		t.Fatalf("Size() = %d, want 3", tree.Size())
+	if tree.LeafCount() != 3 {
+		t.Fatalf("LeafCount() = %d, want 3", tree.LeafCount())
 	}
 
 	a := sha256Sum([]byte("a"))
@@ -121,8 +121,8 @@ func TestAppendFlat(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if tree.Size() != 3 {
-		t.Fatalf("Size() = %d, want 3", tree.Size())
+	if tree.LeafCount() != 3 {
+		t.Fatalf("LeafCount() = %d, want 3", tree.LeafCount())
 	}
 
 	a := sha256Sum([]byte("a"))
@@ -165,8 +165,8 @@ func TestAppendBinaryCompatible(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if tree.Size() != 4 {
-		t.Fatalf("Size() = %d, want 4", tree.Size())
+	if tree.LeafCount() != 4 {
+		t.Fatalf("LeafCount() = %d, want 4", tree.LeafCount())
 	}
 
 	a := sha256Sum([]byte("a"))
@@ -216,7 +216,7 @@ func TestAppendOnlyInsert(t *testing.T) {
 	if err := tree.Append([]byte("second")); err != nil {
 		t.Fatal(err)
 	}
-	if tree.Size() != 2 {
-		t.Fatalf("Size() = %d, want 2", tree.Size())
+	if tree.LeafCount() != 2 {
+		t.Fatalf("LeafCount() = %d, want 2", tree.LeafCount())
 	}
 }

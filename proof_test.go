@@ -24,7 +24,7 @@ func TestInclusionProofRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < tree.Size(); i++ {
+	for i := 0; i < tree.LeafCount(); i++ {
 		proof, err := tree.GenerateInclusionProof(i)
 		if err != nil {
 			t.Fatalf("GenerateInclusionProof(%d): %v", i, err)
