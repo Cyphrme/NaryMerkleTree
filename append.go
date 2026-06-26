@@ -91,16 +91,6 @@ func indexToPath(index, depth, arity int) Path {
 	return path
 }
 
-// nextLeafPath returns the path for the next append-order leaf.
-func (t *Tree) nextLeafPath() (Path, error) {
-	n := len(t.leafPaths)
-	paths := leafPaths(n+1, t.Arity)
-	if len(paths) <= n {
-		return nil, ErrInvalidParam
-	}
-	return paths[n], nil
-}
-
 // pathsEqual reports whether two paths are identical.
 func pathsEqual(a, b Path) bool {
 	if len(a) != len(b) {
