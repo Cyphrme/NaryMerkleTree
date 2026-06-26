@@ -3,22 +3,21 @@
 A Go library for an n-ary Merkle tree with inclusion/consistency proofs, plus
 Cyphr-specific optimizations (singleton promotion, collapse, null nodes).
 
-This library supports arbitrary inserts.
+This library supports arbitrary inserts, meaning a path describing node insert
+may be used.
 
-This library has no support for "prefixes", which we consider to be an
-anti-pattern, and instead uses pure hashing. If you need prefixes, you need to
-manually add them to the preimage yourself.
+## How an N-ary Merkle Tree Works
 
-This library may be used with the Merkle Mountain Range wrapper, which then may
-be wrapped by the multi-hash Epoch Merkle Log.
+A **leaf** is any node whose path is not a prefix of another node's path.
+Internal digests are computed bottom-up from children in index order. 
 
-## Hash algorithm
-
-Nodes are stored flat by `path` and linked on `Rebuild()`. A **leaf** is any
-node whose path is not a prefix of another node's path. Internal digests are
-computed bottom-up from children in index order.
+Nodes are stored flat by `path` and linked on `Rebuild()`. 
 
 `Promote` and `Collapse` are package-level toggles (both default to `true`).
+
+A **null** node has `Digest == nil`. When combined with non-null siblings, null
+children contribute the **null digest**, which is calculated as `hash("")`, also
+termed the null identity.
 
 | Condition                           | Parent digest                          |
 |-------------------------------------|--------------------------------------  |
@@ -27,9 +26,6 @@ computed bottom-up from children in index order.
 | `Collapse` (all children equal)     | repeat digest (no rehash)              |
 | Default                             | `hash(concat(digests in index order))` |
 
-A **null** node has `Digest == nil`. When combined with non-null siblings, null
-children contribute the **null digest** `hash("")`. Missing child indices are
-treated as null nodes (left-filled convention).
 
 **Arity** is a tree-level setting for append-only leaf placement (`Tree.Arity`).
 `0` or `1` is n-ary (leaves are root children `[0..n-1]`). `>= 2` is k-ary
@@ -83,6 +79,15 @@ balanced if there is a unary case.  Whereas "balanced" and "symmetrical" and
 "not-have-a-unary-case" can be ambiguated for binary Merkle trees, it must be
 disambiguated for n-ary Merkle trees. Even though a balanced tree is symmetrical and a
 symmetrical tree is balanced, balances carries more of the connotation that a subtree or branch may be balanced while the whole tree may not be symmetrical. A balanced/symmetrical tree may have unary cases.
+
+
+### Notes
+This library has no support for "prefixes", which we consider to be an
+anti-pattern, and instead uses pure hashing. If you need prefixes, you need to
+manually add them to the preimage yourself.
+
+This library may be used with the Merkle Mountain Range wrapper, which then may
+be wrapped by the multi-hash Epoch Merkle Log.
 
 ## See also
  - [N-ary Merkle Tree (this repo)](https://github.com/Cyphrme/NaryMerkleTree) - The n-ary Merkle tree.
